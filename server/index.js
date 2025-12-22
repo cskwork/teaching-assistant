@@ -28,14 +28,6 @@ function broadcastEvent(event) {
   sseClients.forEach((res) => {
     sendSse(res, payload);
   });
-
-  if (wss) {
-    wss.clients.forEach((client) => {
-      if (client.readyState === 1) {
-        client.send(JSON.stringify({ event: payload }));
-      }
-    });
-  }
 }
 
 function stopTextStream() {
@@ -47,7 +39,7 @@ function stopTextStream() {
   activeTextStream = null;
 }
 
-function streamTextEvents(text) {
+function streamTextEvents(text, durationSeconds) {
   if (!text) {
     return;
   }
@@ -60,8 +52,15 @@ function streamTextEvents(text) {
 
   let index = 0;
   const total = source.length;
-  const step = total > 120 ? 6 : 4;
-  const interval = total > 120 ? 50 : 70;
+  const durationMs = durationSeconds ? Math.max(1400, durationSeconds * 1000) : null;
+  const targetSteps = durationMs
+    ? Math.max(18, Math.min(240, Math.round(durationMs / 90)))
+    : null;
+  const step = targetSteps ? Math.max(1, Math.ceil(total / targetSteps)) : (total > 160 ? 4 : 3);
+  const steps = Math.max(1, Math.ceil(total / step));
+  const interval = durationMs
+    ? Math.max(50, Math.round(durationMs / steps))
+    : (total > 160 ? 90 : 120);
 
   activeTextStream = {};
   activeTextStream.interval = setInterval(() => {
@@ -86,7 +85,7 @@ function streamTextEvents(text) {
   activeTextStream.timeout = setTimeout(() => {
     stopTextStream();
     broadcastEvent({ type: 'text_done' });
-  }, Math.max(2500, interval * (total / step + 4)));
+  }, Math.max(2500, interval * (steps + 6)));
 }
 
 // Gemini TTS API 설정
@@ -120,6 +119,18 @@ function pcmToWav(base64Pcm) {
   wavHeader.writeUInt32LE(dataSize, 40);
 
   return Buffer.concat([wavHeader, pcmBuffer]);
+}
+
+function getWavDurationSeconds(wavBuffer) {
+  const dataSize = Math.max(0, wavBuffer.length - 44);
+  const bytesPerSample = 2;
+  const sampleRate = 24000;
+  const numChannels = 1;
+  const totalSamples = dataSize / (bytesPerSample * numChannels);
+  if (!Number.isFinite(totalSamples) || totalSamples <= 0) {
+    return null;
+  }
+  return totalSamples / sampleRate;
 }
 
 // TTS API 호출 함수
@@ -225,9 +236,9 @@ app.post('/tts', async (req, res) => {
         preview: text.substring(0, 80)
       }
     });
-    streamTextEvents(text);
 
     const wavBuffer = await generateSpeech(text);
+    const durationSeconds = getWavDurationSeconds(wavBuffer);
 
     // WebSocket 클라이언트에 브로드캐스트 (기본 활성화)
     let broadcastedTo = 0;
@@ -243,6 +254,10 @@ app.post('/tts', async (req, res) => {
         clients: broadcastedTo
       }
     });
+
+    setTimeout(() => {
+      streamTextEvents(text, durationSeconds);
+    }, 120);
 
     res.set({
       'Content-Type': 'audio/wav',
@@ -296,9 +311,9 @@ wss.on('connection', (ws) => {
           preview: text.substring(0, 80)
         }
       });
-      streamTextEvents(text);
 
       const wavBuffer = await generateSpeech(text);
+      const durationSeconds = getWavDurationSeconds(wavBuffer);
       ws.send(wavBuffer);
 
       broadcastEvent({
@@ -308,6 +323,10 @@ wss.on('connection', (ws) => {
           bytes: wavBuffer.length
         }
       });
+
+      setTimeout(() => {
+        streamTextEvents(text, durationSeconds);
+      }, 120);
 
       console.log('WebSocket TTS 응답 전송 완료');
     } catch (error) {

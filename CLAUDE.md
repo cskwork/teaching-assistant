@@ -223,4 +223,9 @@ start-all 스크립트에서 npx tsx 실행이 대화형 확인 프롬프트에 
 
 /events에 실제 `text_delta`가 들어오지 않으면 UI가 데모 텍스트만 보여준다.
 해결은 `/tts` 요청 시 텍스트를 잘게 나눠 `text_delta`와 `text_done`을 SSE로 발행하도록 서버에서 스트리밍을 추가하는 것이다.
+
+## 텍스트가 두 번 반복되는 원인
+
+SSE와 WebSocket에서 동일한 이벤트를 동시에 보내면 UI가 중복 수신해 문장이 두 번씩 붙는다.
+해결은 이벤트는 SSE로만 보내고 WebSocket은 오디오 바이너리 전송에만 사용한다.
 </insight>
