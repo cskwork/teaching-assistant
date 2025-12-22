@@ -157,8 +157,8 @@
       display: grid;
       grid-template-columns: 1.6fr 1fr;
       grid-template-areas:
-        "progress progress"
-        "canvas chat";
+        "canvas chat"
+        "progress progress";
       gap: 24px;
     }
 
@@ -411,7 +411,7 @@
     }
 
     .chat-body {
-      height: 640px;
+      height: 800px;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -451,7 +451,7 @@
       border: 1px solid var(--stroke);
       background: #fff;
       overflow: hidden;
-      height: 640px;
+      height: 800px;
     }
 
     .canvas-shell canvas {
@@ -522,9 +522,9 @@
       .content {
         grid-template-columns: 1fr;
         grid-template-areas:
-          "progress"
           "canvas"
-          "chat";
+          "chat"
+          "progress";
       }
 
       .hero {
