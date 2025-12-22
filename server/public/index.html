@@ -155,7 +155,10 @@
 
     .content {
       display: grid;
-      grid-template-columns: 1.1fr 1fr;
+      grid-template-columns: 1.4fr 1fr;
+      grid-template-areas:
+        "progress progress"
+        "canvas chat";
       gap: 24px;
     }
 
@@ -172,6 +175,18 @@
 
     .panel.wide {
       grid-column: 1 / -1;
+    }
+
+    .panel.live {
+      grid-area: progress;
+    }
+
+    .panel.canvas {
+      grid-area: canvas;
+    }
+
+    .panel.chat {
+      grid-area: chat;
     }
 
     .panel-header {
@@ -489,6 +504,10 @@
     @media (max-width: 980px) {
       .content {
         grid-template-columns: 1fr;
+        grid-template-areas:
+          "progress"
+          "canvas"
+          "chat";
       }
 
       .hero {
@@ -527,7 +546,7 @@
       <section class="panel live">
         <div class="panel-header">
           <div>
-            <h2>실시간 진행</h2>
+            <h2>실시간 상태</h2>
             <p class="muted">스트리밍 이벤트와 진행률을 동시에 보여주는 패널입니다.</p>
           </div>
           <div id="statusPill" class="status-pill">연결 중</div>
@@ -598,6 +617,20 @@
         </div>
       </section>
 
+      <section class="panel canvas">
+        <div class="panel-header">
+          <div>
+            <h2>Excalidraw 캔버스</h2>
+            <p class="muted">드로잉 진행 상황이 실시간으로 반영됩니다.</p>
+          </div>
+          <div id="canvasStatus" class="status-pill">대기</div>
+        </div>
+        <div class="canvas-shell">
+          <iframe id="excalidrawFrame" title="Excalidraw Canvas" src="http://localhost:3333"></iframe>
+        </div>
+        <p class="canvas-note">캔버스가 보이지 않으면 <a href="http://localhost:3333" target="_blank" rel="noreferrer">새 탭</a>에서 확인하세요.</p>
+      </section>
+
       <section class="panel chat" id="chatPanel">
         <div class="panel-header">
           <div>
@@ -627,19 +660,6 @@
         </div>
       </section>
 
-      <section class="panel wide">
-        <div class="panel-header">
-          <div>
-            <h2>Excalidraw 캔버스</h2>
-            <p class="muted">드로잉 진행 상황이 실시간으로 반영됩니다.</p>
-          </div>
-          <div id="canvasStatus" class="status-pill">대기</div>
-        </div>
-        <div class="canvas-shell">
-          <iframe id="excalidrawFrame" title="Excalidraw Canvas" src="http://localhost:3333"></iframe>
-        </div>
-        <p class="canvas-note">캔버스가 보이지 않으면 <a href="http://localhost:3333" target="_blank" rel="noreferrer">새 탭</a>에서 확인하세요.</p>
-      </section>
     </section>
   </main>
 
