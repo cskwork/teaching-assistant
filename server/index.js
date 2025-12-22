@@ -66,7 +66,7 @@ async function generateSpeech(text) {
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
-              voiceName: 'Kore'
+              voiceName: 'Callirrhoe'
             }
           }
         }
