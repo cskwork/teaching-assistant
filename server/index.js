@@ -8,6 +8,7 @@ const app = express();
 const PORT = 3334;
 let wss;
 const sseClients = new Set();
+let activeTextStream = null;
 
 // 미들웨어 설정
 app.use(cors());
@@ -35,6 +36,57 @@ function broadcastEvent(event) {
       }
     });
   }
+}
+
+function stopTextStream() {
+  if (!activeTextStream) {
+    return;
+  }
+  clearInterval(activeTextStream.interval);
+  clearTimeout(activeTextStream.timeout);
+  activeTextStream = null;
+}
+
+function streamTextEvents(text) {
+  if (!text) {
+    return;
+  }
+  stopTextStream();
+
+  const source = text.replace(/\s+/g, ' ').trim();
+  if (!source) {
+    return;
+  }
+
+  let index = 0;
+  const total = source.length;
+  const step = total > 120 ? 6 : 4;
+  const interval = total > 120 ? 50 : 70;
+
+  activeTextStream = {};
+  activeTextStream.interval = setInterval(() => {
+    const slice = source.slice(index, index + step);
+    index += step;
+    const progress = Math.min(100, Math.round((index / total) * 100));
+
+    broadcastEvent({
+      type: 'text_delta',
+      payload: {
+        delta: slice,
+        progress
+      }
+    });
+
+    if (index >= total) {
+      stopTextStream();
+      broadcastEvent({ type: 'text_done' });
+    }
+  }, interval);
+
+  activeTextStream.timeout = setTimeout(() => {
+    stopTextStream();
+    broadcastEvent({ type: 'text_done' });
+  }, Math.max(2500, interval * (total / step + 4)));
 }
 
 // Gemini TTS API 설정
@@ -173,6 +225,7 @@ app.post('/tts', async (req, res) => {
         preview: text.substring(0, 80)
       }
     });
+    streamTextEvents(text);
 
     const wavBuffer = await generateSpeech(text);
 
@@ -243,6 +296,7 @@ wss.on('connection', (ws) => {
           preview: text.substring(0, 80)
         }
       });
+      streamTextEvents(text);
 
       const wavBuffer = await generateSpeech(text);
       ws.send(wavBuffer);

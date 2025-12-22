@@ -218,4 +218,9 @@ start-all 스크립트에서 npx tsx 실행이 대화형 확인 프롬프트에 
 
 캔버스 실행 경로가 `mcp-excalidraw/packages/...`에서 `mcp-excalidraw/mcp_excalidraw/...`로 바뀌면 모듈을 찾지 못한다.
 해결은 `start-canvas.sh`를 호출하거나 올바른 경로로 실행 명령을 수정한다.
+
+## 실시간 텍스트 스트리밍 미표시 원인
+
+/events에 실제 `text_delta`가 들어오지 않으면 UI가 데모 텍스트만 보여준다.
+해결은 `/tts` 요청 시 텍스트를 잘게 나눠 `text_delta`와 `text_done`을 SSE로 발행하도록 서버에서 스트리밍을 추가하는 것이다.
 </insight>

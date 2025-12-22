@@ -602,7 +602,7 @@
         <div class="panel-header">
           <div>
             <h2>대화</h2>
-            <p class="muted">드로잉 완료 후 메시지가 표시됩니다.</p>
+            <p class="muted">드로잉 상태와 무관하게 대화가 실시간으로 표시됩니다.</p>
           </div>
           <div id="chatStatus" class="status-pill">대기</div>
         </div>
@@ -616,9 +616,9 @@
           <button id="sendBtn" class="btn primary">보내기</button>
         </div>
 
-        <div id="chatOverlay" class="chat-overlay">
+        <div id="chatOverlay" class="chat-overlay hidden">
           <div class="overlay-card">
-            <strong>드로잉이 완료되면 대화가 열립니다.</strong>
+            <strong>드로잉 상태와 무관하게 대화가 표시됩니다.</strong>
             <div class="overlay-progress">
               <div id="drawingOverlayBar" class="overlay-progress-fill"></div>
             </div>
@@ -689,6 +689,7 @@
     let streamBuffer = '';
     let hasRealEvents = false;
     let demoTimers = [];
+    let demoMode = false;
 
     function clamp(value) {
       return Math.max(0, Math.min(100, value));
@@ -765,6 +766,11 @@
 
       if (!options.local && !hasRealEvents) {
         hasRealEvents = true;
+        if (demoMode) {
+          streamBuffer = '';
+          updateStreamText('');
+        }
+        demoMode = false;
         stopDemoRun();
         demoBadge.textContent = '실시간 신호 수신 중';
       }
@@ -992,6 +998,9 @@
       if (hasRealEvents) {
         return;
       }
+      demoMode = true;
+      streamBuffer = '';
+      updateStreamText('');
       demoBadge.textContent = '입력 신호 없음 · 데모 진행 중';
       addFeed('데모 시작');
 
@@ -1088,6 +1097,8 @@
     window.addEventListener('load', () => {
       setStatus('연결 준비', false);
       updateStreamText('');
+      chatStatus.textContent = '실시간';
+      chatStatus.classList.add('ready');
       connectWebSocket();
       connectEventStream();
       scheduleDemoRun();

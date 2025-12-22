@@ -130,6 +130,7 @@ Express server that:
 - Converts base64 PCM to WAV
 - Streams audio via WebSocket
 - Serves browser audio player
+- Emits text streaming events for live UI updates
 
 **Endpoints**:
 - `GET /` - Live session interface
@@ -137,6 +138,7 @@ Express server that:
 - `GET /health` - Server health check
 - `GET /events` - Agent event stream (SSE)
 - `POST /events` - Push agent event updates
+- `POST /tts` emits `text_delta` and `text_done` events for streaming text
 - `WebSocket` - Real-time audio streaming
 
 ### Teaching Skill (`~/.claude/skills/teach.md`)
