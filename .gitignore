@@ -1,0 +1,21 @@
+# Environment variables
+.env
+
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Logs
+*.log
+excalidraw.log
+tts-server.log
+
+# macOS
+.DS_Store
+
+# Transcripts (keep directory structure but ignore content)
+transcripts/*.md
+!transcripts/.gitkeep
+
+# Screen sessions
+.screen/

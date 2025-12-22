@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teaching Assistant - Audio Player</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .status {
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-weight: 500;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .status.connected {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .status.disconnected {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .status.speaking {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .test-area {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      resize: vertical;
+      min-height: 80px;
+      margin-bottom: 10px;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .volume-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .volume-control label {
+      font-size: 14px;
+      color: #666;
+    }
+
+    input[type="range"] {
+      flex: 1;
+    }
+
+    .log {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .log-entry {
+      padding: 5px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .visualizer {
+      margin-top: 20px;
+      height: 60px;
+      background: #f0f0f0;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .visualizer canvas {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Teaching Assistant</h1>
+    <p class="subtitle">한국어 음성 학습 시스템</p>
+
+    <div id="status" class="status disconnected">
+      연결 중...
+    </div>
+
+    <div class="controls">
+      <button id="connectBtn" class="btn-primary">연결</button>
+      <button id="stopBtn" class="btn-secondary" disabled>정지</button>
+    </div>
+
+    <div class="volume-control">
+      <label for="volume">볼륨:</label>
+      <input type="range" id="volume" min="0" max="100" value="80">
+      <span id="volumeValue">80%</span>
+    </div>
+
+    <div class="visualizer">
+      <canvas id="visualizer"></canvas>
+    </div>
+
+    <div class="test-area">
+      <textarea id="testText" placeholder="테스트 텍스트를 입력하세요...">안녕하세요! 오늘은 프로그래밍의 기초에 대해 배워보겠습니다. 함수는 코드를 재사용할 수 있게 해주는 중요한 개념입니다.</textarea>
+      <button id="testBtn" class="btn-primary" style="width: 100%;">테스트 재생</button>
+    </div>
+
+    <div class="log" id="log">
+      <div class="log-entry">로그가 여기에 표시됩니다...</div>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let audioContext = null;
+    let analyser = null;
+    let currentSource = null;
+
+    const statusEl = document.getElementById('status');
+    const connectBtn = document.getElementById('connectBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const volumeSlider = document.getElementById('volume');
+    const volumeValue = document.getElementById('volumeValue');
+    const testBtn = document.getElementById('testBtn');
+    const testText = document.getElementById('testText');
+    const logEl = document.getElementById('log');
+    const visualizerCanvas = document.getElementById('visualizer');
+    const visualizerCtx = visualizerCanvas.getContext('2d');
+
+    // 로그 함수
+    function addLog(message) {
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logEl.insertBefore(entry, logEl.firstChild);
+
+      // 최대 20개 항목만 유지
+      while (logEl.children.length > 20) {
+        logEl.removeChild(logEl.lastChild);
+      }
+    }
+
+    // 볼륨 조절
+    volumeSlider.addEventListener('input', (e) => {
+      const value = e.target.value;
+      volumeValue.textContent = `${value}%`;
+    });
+
+    // WebSocket 연결
+    function connect() {
+      const wsUrl = `ws://${window.location.host}`;
+      addLog(`연결 시도: ${wsUrl}`);
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        statusEl.textContent = '연결됨 - 음성 준비 완료';
+        statusEl.className = 'status connected';
+        connectBtn.textContent = '연결 끊기';
+        addLog('WebSocket 연결 성공');
+      };
+
+      ws.onmessage = async (event) => {
+        if (event.data instanceof Blob) {
+          addLog(`음성 데이터 수신 (${(event.data.size / 1024).toFixed(1)}KB)`);
+          statusEl.textContent = '재생 중...';
+          statusEl.className = 'status speaking';
+          stopBtn.disabled = false;
+
+          await playAudio(event.data);
+
+          statusEl.textContent = '연결됨 - 음성 준비 완료';
+          statusEl.className = 'status connected';
+          stopBtn.disabled = true;
+        } else {
+          const data = JSON.parse(event.data);
+          if (data.error) {
+            addLog(`오류: ${data.error}`);
+          }
+        }
+      };
+
+      ws.onerror = (error) => {
+        addLog('WebSocket 오류 발생');
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = '연결 끊김';
+        statusEl.className = 'status disconnected';
+        connectBtn.textContent = '연결';
+        addLog('WebSocket 연결 종료');
+        ws = null;
+      };
+    }
+
+    // 오디오 재생
+    async function playAudio(audioBlob) {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.connect(audioContext.destination);
+        visualize();
+      }
+
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+      if (currentSource) {
+        currentSource.stop();
+      }
+
+      currentSource = audioContext.createBufferSource();
+      currentSource.buffer = audioBuffer;
+
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = volumeSlider.value / 100;
+
+      currentSource.connect(gainNode);
+      gainNode.connect(analyser);
+      currentSource.start(0);
+
+      currentSource.onended = () => {
+        addLog('재생 완료');
+        currentSource = null;
+      };
+    }
+
+    // 비주얼라이저
+    function visualize() {
+      visualizerCanvas.width = visualizerCanvas.offsetWidth;
+      visualizerCanvas.height = visualizerCanvas.offsetHeight;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function draw() {
+        requestAnimationFrame(draw);
+
+        analyser.getByteFrequencyData(dataArray);
+
+        visualizerCtx.fillStyle = '#f0f0f0';
+        visualizerCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+
+        const barWidth = (visualizerCanvas.width / bufferLength) * 2.5;
+        let barHeight;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          barHeight = (dataArray[i] / 255) * visualizerCanvas.height;
+
+          const gradient = visualizerCtx.createLinearGradient(0, visualizerCanvas.height - barHeight, 0, visualizerCanvas.height);
+          gradient.addColorStop(0, '#667eea');
+          gradient.addColorStop(1, '#764ba2');
+
+          visualizerCtx.fillStyle = gradient;
+          visualizerCtx.fillRect(x, visualizerCanvas.height - barHeight, barWidth, barHeight);
+
+          x += barWidth + 1;
+        }
+      }
+
+      draw();
+    }
+
+    // 연결 버튼
+    connectBtn.addEventListener('click', () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      } else {
+        connect();
+      }
+    });
+
+    // 정지 버튼
+    stopBtn.addEventListener('click', () => {
+      if (currentSource) {
+        currentSource.stop();
+        currentSource = null;
+        statusEl.textContent = '연결됨 - 음성 준비 완료';
+        statusEl.className = 'status connected';
+        stopBtn.disabled = true;
+        addLog('재생 정지');
+      }
+    });
+
+    // 테스트 버튼
+    testBtn.addEventListener('click', () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addLog('먼저 서버에 연결해주세요');
+        return;
+      }
+
+      const text = testText.value.trim();
+      if (!text) {
+        addLog('텍스트를 입력해주세요');
+        return;
+      }
+
+      addLog(`TTS 요청: ${text.substring(0, 50)}...`);
+      ws.send(JSON.stringify({ text }));
+    });
+
+    // 자동 연결
+    window.addEventListener('load', () => {
+      addLog('페이지 로드 완료');
+      setTimeout(connect, 500);
+    });
+  </script>
+</body>
+</html>

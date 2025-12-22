@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__excalidraw__create_from_mermaid",
+      "mcp__excalidraw__batch_create_elements",
+      "mcp__excalidraw__update_element",
+      "mcp__excalidraw__query_elements",
+      "mcp__excalidraw__delete_element",
+      "Bash(lsof:*)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "excalidraw"
+  ],
+  "enableAllProjectMcpServers": true
+}
