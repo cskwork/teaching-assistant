@@ -72,7 +72,7 @@ This will:
 - Install dependencies if needed
 - Create necessary directories
 
-### Open Audio Player
+### Open Live Session UI
 
 Open your browser to: `http://localhost:3334`
 
@@ -132,9 +132,11 @@ Express server that:
 - Serves browser audio player
 
 **Endpoints**:
-- `GET /` - Audio player interface
+- `GET /` - Live session interface
 - `POST /tts` - Text-to-speech conversion
 - `GET /health` - Server health check
+- `GET /events` - Agent event stream (SSE)
+- `POST /events` - Push agent event updates
 - `WebSocket` - Real-time audio streaming
 
 ### Teaching Skill (`~/.claude/skills/teach.md`)
@@ -146,14 +148,14 @@ Defines:
 - TTS coordination
 - Transcript recording format
 
-### Audio Player (`server/public/index.html`)
+### Live Session UI (`server/public/index.html`)
 
 Browser interface with:
-- WebSocket auto-connection
-- Real-time audio playback
-- Volume control
-- Audio visualizer
-- Test interface
+- Real-time progress indicators (text, drawing, audio)
+- Event stream updates via SSE
+- WebSocket audio playback
+- Live chat panel unlocked after drawing completion
+- Embedded Excalidraw canvas preview
 
 ## Color Coding
 

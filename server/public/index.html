@@ -3,186 +3,362 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teaching Assistant - Audio Player</title>
+  <title>Teaching Assistant - Live Session</title>
   <style>
+    :root {
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --accent: #ff7a59;
+      --accent-2: #2a9d8f;
+      --accent-3: #f2c94c;
+      --panel: #ffffff;
+      --panel-soft: #f5f7fa;
+      --stroke: #e5e7eb;
+      --shadow: 0 18px 45px rgba(31, 41, 55, 0.12);
+    }
+
     * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: "Space Grotesk", "Avenir Next", "Futura", "Helvetica Neue", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at top, rgba(255, 218, 185, 0.35), transparent 60%),
+        linear-gradient(120deg, #f8f5ef, #eef2f7);
       min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
+      padding: 32px;
     }
 
-    .container {
-      background: white;
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(0px);
+      opacity: 0.55;
+    }
+
+    .orb.one {
+      width: 360px;
+      height: 360px;
+      background: radial-gradient(circle, rgba(255, 122, 89, 0.35), transparent 70%);
+      top: -80px;
+      left: -60px;
+    }
+
+    .orb.two {
+      width: 420px;
+      height: 420px;
+      background: radial-gradient(circle, rgba(42, 157, 143, 0.3), transparent 70%);
+      bottom: -140px;
+      right: -120px;
+    }
+
+    .grid-lines {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(rgba(31, 41, 55, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(31, 41, 55, 0.03) 1px, transparent 1px);
+      background-size: 32px 32px;
+      opacity: 0.7;
+    }
+
+    .app {
+      position: relative;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 24px 28px;
       border-radius: 20px;
-      padding: 40px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      max-width: 500px;
-      width: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.24em;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
     }
 
     h1 {
-      color: #667eea;
-      margin-bottom: 10px;
       font-size: 28px;
+      margin: 8px 0 6px;
     }
 
-    .subtitle {
-      color: #666;
-      margin-bottom: 30px;
+    .lead {
+      color: var(--muted);
       font-size: 14px;
-    }
-
-    .status {
-      padding: 15px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-      font-weight: 500;
-      text-align: center;
-      transition: all 0.3s ease;
-    }
-
-    .status.connected {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-
-    .status.disconnected {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-
-    .status.speaking {
-      background: #fff3cd;
-      color: #856404;
-      border: 1px solid #ffeaa7;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.02); }
+      max-width: 520px;
+      line-height: 1.5;
     }
 
     .controls {
       display: flex;
       gap: 10px;
-      margin-bottom: 20px;
+      flex-wrap: wrap;
     }
 
-    button {
-      flex: 1;
-      padding: 12px 20px;
+    .btn {
       border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 500;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      background: var(--panel);
+      color: var(--ink);
+      box-shadow: 0 8px 16px rgba(31, 41, 55, 0.12);
     }
 
-    button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(255, 122, 89, 0.35);
     }
 
-    button:active {
-      transform: translateY(0);
+    .btn.ghost {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid var(--stroke);
+      box-shadow: none;
     }
 
-    button:disabled {
-      opacity: 0.5;
+    .btn:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
+      box-shadow: none;
     }
 
-    .btn-primary {
-      background: #667eea;
-      color: white;
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
     }
 
-    .btn-secondary {
-      background: #f0f0f0;
-      color: #333;
+    .content {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 24px;
     }
 
-    .test-area {
-      margin-top: 20px;
-      padding: 20px;
-      background: #f8f9fa;
-      border-radius: 10px;
+    .panel {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
     }
 
-    textarea {
-      width: 100%;
-      padding: 10px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      font-size: 14px;
-      resize: vertical;
-      min-height: 80px;
+    .panel.wide {
+      grid-column: 1 / -1;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      gap: 12px;
+    }
+
+    .panel-header h2 {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .status-pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #fff3e6;
+      color: #b45309;
+      border: 1px solid rgba(255, 122, 89, 0.25);
+    }
+
+    .status-pill.ready {
+      background: #e8f7f5;
+      color: #1b7f73;
+      border-color: rgba(42, 157, 143, 0.35);
+    }
+
+    .is-hidden {
+      display: none;
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .progress-card {
+      background: var(--panel-soft);
+      border-radius: 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--stroke);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .progress-bar {
+      position: relative;
+      height: 8px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-3));
+      border-radius: inherit;
+      transition: width 0.4s ease;
+    }
+
+    .progress-fill.drawing {
+      background: linear-gradient(90deg, #2a9d8f, #64b6ac);
+    }
+
+    .progress-fill.audio {
+      background: linear-gradient(90deg, #1f2937, #6b7280);
+    }
+
+    .progress-meta {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .stream-card {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px dashed rgba(255, 122, 89, 0.4);
+      background: #fff8f2;
+    }
+
+    .stream-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: #9a3412;
       margin-bottom: 10px;
     }
 
-    textarea:focus {
-      outline: none;
-      border-color: #667eea;
+    .demo-badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(42, 157, 143, 0.15);
+      color: #1b7f73;
     }
 
-    .volume-control {
+    .stream-body {
+      min-height: 64px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #4b5563;
+      position: relative;
+      padding-right: 12px;
+    }
+
+    .stream-body::after {
+      content: "|";
+      position: absolute;
+      right: 2px;
+      top: 0;
+      animation: blink 1s step-end infinite;
+      color: #111827;
+    }
+
+    .feed-card {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: #fff;
+    }
+
+    .feed-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 140px;
+      overflow: auto;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .feed-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .feed-item strong {
+      color: #111827;
+    }
+
+    .audio-card {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: #f9fafb;
+    }
+
+    .audio-controls {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-top: 15px;
+      gap: 12px;
+      font-size: 13px;
+      margin-bottom: 10px;
     }
 
-    .volume-control label {
-      font-size: 14px;
-      color: #666;
-    }
-
-    input[type="range"] {
+    .audio-controls input[type="range"] {
       flex: 1;
     }
 
-    .log {
-      margin-top: 20px;
-      padding: 15px;
-      background: #f8f9fa;
-      border-radius: 10px;
-      max-height: 200px;
-      overflow-y: auto;
-      font-size: 12px;
-      color: #666;
-    }
-
-    .log-entry {
-      padding: 5px 0;
-      border-bottom: 1px solid #e0e0e0;
-    }
-
-    .log-entry:last-child {
-      border-bottom: none;
-    }
-
     .visualizer {
-      margin-top: 20px;
-      height: 60px;
-      background: #f0f0f0;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      height: 50px;
+      background: #eef2f7;
+      border-radius: 12px;
       overflow: hidden;
     }
 
@@ -190,41 +366,282 @@
       width: 100%;
       height: 100%;
     }
+
+    .chat-body {
+      height: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-right: 8px;
+      overflow: auto;
+    }
+
+    .bubble {
+      padding: 12px 14px;
+      border-radius: 16px;
+      max-width: 80%;
+      font-size: 14px;
+      line-height: 1.6;
+      position: relative;
+      background: #f3f4f6;
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: #ffe8e1;
+      border: 1px solid rgba(255, 122, 89, 0.4);
+    }
+
+    .bubble.agent {
+      align-self: flex-start;
+      background: #e7f4f2;
+      border: 1px solid rgba(42, 157, 143, 0.4);
+    }
+
+    .bubble.typing {
+      border-style: dashed;
+      opacity: 0.85;
+    }
+
+    .canvas-shell {
+      border-radius: 18px;
+      border: 1px solid var(--stroke);
+      background: #fff;
+      overflow: hidden;
+      height: 420px;
+    }
+
+    .canvas-shell iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .canvas-note {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .chat-input {
+      display: flex;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .chat-input textarea {
+      flex: 1;
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      padding: 10px 12px;
+      font-size: 14px;
+      resize: none;
+      min-height: 54px;
+    }
+
+    .chat-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+
+    .chat-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .overlay-card {
+      background: #fff;
+      padding: 20px 22px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .overlay-progress {
+      height: 8px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      overflow: hidden;
+    }
+
+    .overlay-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2a9d8f, #64b6ac);
+      transition: width 0.4s ease;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    @media (max-width: 980px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .chat-body {
+        height: 320px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Teaching Assistant</h1>
-    <p class="subtitle">한국어 음성 학습 시스템</p>
-
-    <div id="status" class="status disconnected">
-      연결 중...
-    </div>
-
-    <div class="controls">
-      <button id="connectBtn" class="btn-primary">연결</button>
-      <button id="stopBtn" class="btn-secondary" disabled>정지</button>
-    </div>
-
-    <div class="volume-control">
-      <label for="volume">볼륨:</label>
-      <input type="range" id="volume" min="0" max="100" value="80">
-      <span id="volumeValue">80%</span>
-    </div>
-
-    <div class="visualizer">
-      <canvas id="visualizer"></canvas>
-    </div>
-
-    <div class="test-area">
-      <textarea id="testText" placeholder="테스트 텍스트를 입력하세요...">안녕하세요! 오늘은 프로그래밍의 기초에 대해 배워보겠습니다. 함수는 코드를 재사용할 수 있게 해주는 중요한 개념입니다.</textarea>
-      <button id="testBtn" class="btn-primary" style="width: 100%;">테스트 재생</button>
-    </div>
-
-    <div class="log" id="log">
-      <div class="log-entry">로그가 여기에 표시됩니다...</div>
-    </div>
+  <div class="backdrop">
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+    <div class="grid-lines"></div>
   </div>
+
+  <main class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Teaching Assistant</p>
+        <h1>라이브 에이전트 세션</h1>
+        <p class="lead">그림과 음성이 생성되는 동안에도 계속 움직이는 실시간 흐름을 보여줍니다. 드로잉 완료 후에는 채팅 화면으로 자연스럽게 전환됩니다.</p>
+      </div>
+      <div class="controls">
+        <button id="connectBtn" class="btn primary">연결</button>
+        <button id="demoBtn" class="btn ghost">데모</button>
+        <button id="stopBtn" class="btn ghost" disabled>오디오 정지</button>
+      </div>
+    </header>
+
+    <section class="content">
+      <section class="panel live">
+        <div class="panel-header">
+          <div>
+            <h2>실시간 진행</h2>
+            <p class="muted">스트리밍 이벤트와 진행률을 동시에 보여주는 패널입니다.</p>
+          </div>
+          <div id="statusPill" class="status-pill">연결 중</div>
+        </div>
+
+        <div class="status-grid">
+          <div class="progress-card">
+            <div class="progress-header">
+              <span>텍스트 스트리밍</span>
+              <span id="textProgressValue">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div id="textProgressBar" class="progress-fill"></div>
+            </div>
+            <div id="textStatus" class="progress-meta">대기 중</div>
+          </div>
+
+          <div class="progress-card">
+            <div class="progress-header">
+              <span>드로잉 진행률</span>
+              <span id="drawingProgressValue">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div id="drawingProgressBar" class="progress-fill drawing"></div>
+            </div>
+            <div id="drawingStatus" class="progress-meta">드로잉 대기</div>
+          </div>
+
+          <div class="progress-card">
+            <div class="progress-header">
+              <span>오디오 상태</span>
+              <span id="audioProgressValue">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div id="audioProgressBar" class="progress-fill audio"></div>
+            </div>
+            <div id="audioStatus" class="progress-meta">대기 중</div>
+          </div>
+        </div>
+
+        <div class="stream-card">
+          <div class="stream-header">
+            <span>스트리밍 텍스트</span>
+            <span id="demoBadge" class="demo-badge">실시간 신호 대기</span>
+          </div>
+          <div id="streamingText" class="stream-body"></div>
+        </div>
+
+        <div class="feed-card">
+          <div class="stream-header">
+            <span>진행 로그</span>
+          </div>
+          <div id="eventFeed" class="feed-body"></div>
+        </div>
+
+        <div class="audio-card">
+          <div class="stream-header">
+            <span>오디오 모니터</span>
+          </div>
+          <div class="audio-controls">
+            <label for="volume">볼륨</label>
+            <input type="range" id="volume" min="0" max="100" value="80">
+            <span id="volumeValue">80%</span>
+          </div>
+          <div class="visualizer">
+            <canvas id="visualizer"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel chat" id="chatPanel">
+        <div class="panel-header">
+          <div>
+            <h2>대화</h2>
+            <p class="muted">드로잉 완료 후 메시지가 표시됩니다.</p>
+          </div>
+          <div id="chatStatus" class="status-pill">대기</div>
+        </div>
+
+        <div id="chatBody" class="chat-body">
+          <div id="typingBubble" class="bubble agent typing is-hidden"><p></p></div>
+        </div>
+
+        <div class="chat-input">
+          <textarea id="chatInput" placeholder="질문을 입력하세요..."></textarea>
+          <button id="sendBtn" class="btn primary">보내기</button>
+        </div>
+
+        <div id="chatOverlay" class="chat-overlay">
+          <div class="overlay-card">
+            <strong>드로잉이 완료되면 대화가 열립니다.</strong>
+            <div class="overlay-progress">
+              <div id="drawingOverlayBar" class="overlay-progress-fill"></div>
+            </div>
+            <div id="drawingOverlayText" class="muted">0%</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-header">
+          <div>
+            <h2>Excalidraw 캔버스</h2>
+            <p class="muted">드로잉 진행 상황이 실시간으로 반영됩니다.</p>
+          </div>
+          <div id="canvasStatus" class="status-pill">대기</div>
+        </div>
+        <div class="canvas-shell">
+          <iframe id="excalidrawFrame" title="Excalidraw Canvas" src="http://localhost:3333"></iframe>
+        </div>
+        <p class="canvas-note">캔버스가 보이지 않으면 <a href="http://localhost:3333" target="_blank" rel="noreferrer">새 탭</a>에서 확인하세요.</p>
+      </section>
+    </section>
+  </main>
 
   <script>
     let ws = null;
@@ -232,85 +649,272 @@
     let analyser = null;
     let currentSource = null;
 
-    const statusEl = document.getElementById('status');
+    const statusPill = document.getElementById('statusPill');
+    const chatStatus = document.getElementById('chatStatus');
     const connectBtn = document.getElementById('connectBtn');
+    const demoBtn = document.getElementById('demoBtn');
     const stopBtn = document.getElementById('stopBtn');
     const volumeSlider = document.getElementById('volume');
     const volumeValue = document.getElementById('volumeValue');
-    const testBtn = document.getElementById('testBtn');
-    const testText = document.getElementById('testText');
-    const logEl = document.getElementById('log');
+    const demoBadge = document.getElementById('demoBadge');
+    const streamingText = document.getElementById('streamingText');
+    const eventFeed = document.getElementById('eventFeed');
     const visualizerCanvas = document.getElementById('visualizer');
     const visualizerCtx = visualizerCanvas.getContext('2d');
 
-    // 로그 함수
-    function addLog(message) {
-      const entry = document.createElement('div');
-      entry.className = 'log-entry';
-      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-      logEl.insertBefore(entry, logEl.firstChild);
+    const textProgressBar = document.getElementById('textProgressBar');
+    const textProgressValue = document.getElementById('textProgressValue');
+    const textStatus = document.getElementById('textStatus');
 
-      // 최대 20개 항목만 유지
-      while (logEl.children.length > 20) {
-        logEl.removeChild(logEl.lastChild);
+    const drawingProgressBar = document.getElementById('drawingProgressBar');
+    const drawingProgressValue = document.getElementById('drawingProgressValue');
+    const drawingStatus = document.getElementById('drawingStatus');
+    const drawingOverlayBar = document.getElementById('drawingOverlayBar');
+    const drawingOverlayText = document.getElementById('drawingOverlayText');
+
+    const audioProgressBar = document.getElementById('audioProgressBar');
+    const audioProgressValue = document.getElementById('audioProgressValue');
+    const audioStatus = document.getElementById('audioStatus');
+
+    const canvasStatus = document.getElementById('canvasStatus');
+    const excalidrawFrame = document.getElementById('excalidrawFrame');
+    const chatPanel = document.getElementById('chatPanel');
+    const chatOverlay = document.getElementById('chatOverlay');
+    const chatBody = document.getElementById('chatBody');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const typingBubble = document.getElementById('typingBubble');
+    const typingText = typingBubble ? typingBubble.querySelector('p') : null;
+
+    let streamBuffer = '';
+    let hasRealEvents = false;
+    let demoTimers = [];
+
+    function clamp(value) {
+      return Math.max(0, Math.min(100, value));
+    }
+
+    function updateProgress(bar, label, value) {
+      const next = clamp(value);
+      bar.style.width = `${next}%`;
+      label.textContent = `${Math.round(next)}%`;
+      return next;
+    }
+
+    function addFeed(message, detail) {
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      const label = document.createElement('strong');
+      label.textContent = message;
+      const time = document.createElement('span');
+      time.textContent = detail || new Date().toLocaleTimeString();
+      item.appendChild(label);
+      item.appendChild(time);
+      eventFeed.insertBefore(item, eventFeed.firstChild);
+      while (eventFeed.children.length > 10) {
+        eventFeed.removeChild(eventFeed.lastChild);
       }
     }
 
-    // 볼륨 조절
-    volumeSlider.addEventListener('input', (e) => {
-      const value = e.target.value;
-      volumeValue.textContent = `${value}%`;
-    });
+    function setStatus(text, isReady) {
+      statusPill.textContent = text;
+      statusPill.classList.toggle('ready', !!isReady);
+    }
 
-    // WebSocket 연결
-    function connect() {
+    function setChatReady(ready) {
+      if (ready) {
+        chatOverlay.classList.add('hidden');
+        chatStatus.textContent = '활성화';
+        chatStatus.classList.add('ready');
+      }
+    }
+
+    function addChatMessage(role, text) {
+      const bubble = document.createElement('div');
+      bubble.className = `bubble ${role}`;
+      const paragraph = document.createElement('p');
+      paragraph.textContent = text;
+      bubble.appendChild(paragraph);
+      if (typingBubble) {
+        chatBody.insertBefore(bubble, typingBubble);
+      } else {
+        chatBody.appendChild(bubble);
+      }
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function updateStreamText(text) {
+      streamingText.textContent = text;
+      if (typingBubble && typingText) {
+        typingText.textContent = text;
+        typingBubble.classList.toggle('is-hidden', !text);
+        chatBody.scrollTop = chatBody.scrollHeight;
+      }
+    }
+
+    function handleAgentEvent(rawEvent, options = {}) {
+      const event = rawEvent && rawEvent.event ? rawEvent.event : rawEvent;
+      if (!event || !event.type) {
+        return;
+      }
+
+      if (event.type === 'connected') {
+        addFeed('이벤트 스트림 연결됨');
+        return;
+      }
+
+      if (!options.local && !hasRealEvents) {
+        hasRealEvents = true;
+        stopDemoRun();
+        demoBadge.textContent = '실시간 신호 수신 중';
+      }
+
+      if (event.type === 'text_delta') {
+        const delta = event.payload && event.payload.delta ? event.payload.delta : '';
+        streamBuffer += delta;
+        updateStreamText(streamBuffer);
+        const nextValue = event.payload && typeof event.payload.progress === 'number'
+          ? event.payload.progress
+          : parseFloat(textProgressValue.textContent) + Math.max(2, delta.length * 0.5);
+        updateProgress(textProgressBar, textProgressValue, nextValue);
+        textStatus.textContent = '스트리밍 중';
+        addFeed('텍스트 수신', delta ? `${delta.length}자` : undefined);
+      }
+
+      if (event.type === 'text_done') {
+        if (streamBuffer.trim()) {
+          addChatMessage('agent', streamBuffer.trim());
+        }
+        streamBuffer = '';
+        updateStreamText('');
+        updateProgress(textProgressBar, textProgressValue, 100);
+        textStatus.textContent = '완료';
+        addFeed('텍스트 완료');
+      }
+
+      if (event.type === 'draw_progress') {
+        const progress = event.payload && typeof event.payload.progress === 'number'
+          ? event.payload.progress
+          : 0;
+        const current = updateProgress(drawingProgressBar, drawingProgressValue, progress);
+        drawingStatus.textContent = current >= 100 ? '완료' : '드로잉 진행 중';
+        drawingOverlayBar.style.width = `${current}%`;
+        drawingOverlayText.textContent = `${Math.round(current)}%`;
+        canvasStatus.textContent = current >= 100 ? '완료' : '드로잉 중';
+        canvasStatus.classList.toggle('ready', current >= 100);
+        if (current >= 100) {
+          setChatReady(true);
+        }
+      }
+
+      if (event.type === 'draw_complete') {
+        updateProgress(drawingProgressBar, drawingProgressValue, 100);
+        drawingOverlayBar.style.width = '100%';
+        drawingOverlayText.textContent = '100%';
+        drawingStatus.textContent = '완료';
+        canvasStatus.textContent = '완료';
+        canvasStatus.classList.add('ready');
+        addFeed('드로잉 완료');
+        setChatReady(true);
+      }
+
+      if (event.type === 'audio_status') {
+        const state = event.payload && event.payload.state ? event.payload.state : 'idle';
+        const mapping = {
+          requested: { label: '요청됨', value: 20 },
+          generating: { label: '생성 중', value: 55 },
+          ready: { label: '준비됨', value: 80 },
+          playing: { label: '재생 중', value: 100 },
+          error: { label: '오류', value: 100 }
+        };
+        const entry = mapping[state] || { label: '대기 중', value: 0 };
+        updateProgress(audioProgressBar, audioProgressValue, entry.value);
+        audioStatus.textContent = entry.label;
+        addFeed('오디오 상태', entry.label);
+      }
+
+      if (event.type === 'chat_message' && event.payload) {
+        const role = event.payload.role === 'user' ? 'user' : 'agent';
+        const text = event.payload.text || '';
+        if (text) {
+          addChatMessage(role, text);
+          addFeed('채팅 메시지', role === 'user' ? '사용자' : '에이전트');
+        }
+      }
+
+      if (event.type === 'log' && event.payload && event.payload.message) {
+        addFeed(event.payload.message);
+      }
+    }
+
+    function connectEventStream() {
+      try {
+        const eventSource = new EventSource('/events');
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            handleAgentEvent(data);
+          } catch (error) {
+            addFeed('이벤트 파싱 실패');
+          }
+        };
+        eventSource.onerror = () => {
+          addFeed('이벤트 스트림 연결 실패');
+          if (!hasRealEvents) {
+            scheduleDemoRun();
+          }
+        };
+      } catch (error) {
+        addFeed('이벤트 스트림 미지원');
+        scheduleDemoRun();
+      }
+    }
+
+    function connectWebSocket() {
       const wsUrl = `ws://${window.location.host}`;
-      addLog(`연결 시도: ${wsUrl}`);
-
+      addFeed('WebSocket 연결 시도', wsUrl.replace('ws://', ''));
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        statusEl.textContent = '연결됨 - 음성 준비 완료';
-        statusEl.className = 'status connected';
+        setStatus('연결됨', true);
         connectBtn.textContent = '연결 끊기';
-        addLog('WebSocket 연결 성공');
+        addFeed('WebSocket 연결 성공');
       };
 
       ws.onmessage = async (event) => {
         if (event.data instanceof Blob) {
-          addLog(`음성 데이터 수신 (${(event.data.size / 1024).toFixed(1)}KB)`);
-          statusEl.textContent = '재생 중...';
-          statusEl.className = 'status speaking';
+          addFeed('오디오 수신', `${(event.data.size / 1024).toFixed(1)}KB`);
           stopBtn.disabled = false;
-
           await playAudio(event.data);
-
-          statusEl.textContent = '연결됨 - 음성 준비 완료';
-          statusEl.className = 'status connected';
           stopBtn.disabled = true;
         } else {
-          const data = JSON.parse(event.data);
-          if (data.error) {
-            addLog(`오류: ${data.error}`);
+          try {
+            const data = JSON.parse(event.data);
+            if (data.error) {
+              addFeed('오류', data.error);
+              return;
+            }
+            if (data.event) {
+              handleAgentEvent(data.event);
+            }
+          } catch (error) {
+            addFeed('메시지 파싱 실패');
           }
         }
       };
 
-      ws.onerror = (error) => {
-        addLog('WebSocket 오류 발생');
-        console.error('WebSocket error:', error);
+      ws.onerror = () => {
+        addFeed('WebSocket 오류 발생');
       };
 
       ws.onclose = () => {
-        statusEl.textContent = '연결 끊김';
-        statusEl.className = 'status disconnected';
+        setStatus('연결 끊김', false);
         connectBtn.textContent = '연결';
-        addLog('WebSocket 연결 종료');
+        addFeed('WebSocket 연결 종료');
         ws = null;
       };
     }
 
-    // 오디오 재생
     async function playAudio(audioBlob) {
       if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -337,42 +941,31 @@
       gainNode.connect(analyser);
       currentSource.start(0);
 
+      handleAgentEvent({ type: 'audio_status', payload: { state: 'playing' } }, { local: true });
+
       currentSource.onended = () => {
-        addLog('재생 완료');
         currentSource = null;
+        handleAgentEvent({ type: 'audio_status', payload: { state: 'ready' } }, { local: true });
       };
     }
 
-    // 비주얼라이저
     function visualize() {
       visualizerCanvas.width = visualizerCanvas.offsetWidth;
       visualizerCanvas.height = visualizerCanvas.offsetHeight;
-
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
 
       function draw() {
         requestAnimationFrame(draw);
-
         analyser.getByteFrequencyData(dataArray);
-
-        visualizerCtx.fillStyle = '#f0f0f0';
+        visualizerCtx.fillStyle = '#eef2f7';
         visualizerCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
-
-        const barWidth = (visualizerCanvas.width / bufferLength) * 2.5;
-        let barHeight;
+        const barWidth = (visualizerCanvas.width / bufferLength) * 2.2;
         let x = 0;
-
         for (let i = 0; i < bufferLength; i++) {
-          barHeight = (dataArray[i] / 255) * visualizerCanvas.height;
-
-          const gradient = visualizerCtx.createLinearGradient(0, visualizerCanvas.height - barHeight, 0, visualizerCanvas.height);
-          gradient.addColorStop(0, '#667eea');
-          gradient.addColorStop(1, '#764ba2');
-
-          visualizerCtx.fillStyle = gradient;
+          const barHeight = (dataArray[i] / 255) * visualizerCanvas.height;
+          visualizerCtx.fillStyle = i % 2 === 0 ? '#ff7a59' : '#2a9d8f';
           visualizerCtx.fillRect(x, visualizerCanvas.height - barHeight, barWidth, barHeight);
-
           x += barWidth + 1;
         }
       }
@@ -380,49 +973,132 @@
       draw();
     }
 
-    // 연결 버튼
+    function scheduleDemoRun() {
+      if (demoTimers.length > 0) {
+        return;
+      }
+      demoTimers.push(setTimeout(startDemoRun, 1200));
+    }
+
+    function stopDemoRun() {
+      demoTimers.forEach((timer) => {
+        clearTimeout(timer);
+        clearInterval(timer);
+      });
+      demoTimers = [];
+    }
+
+    function startDemoRun() {
+      if (hasRealEvents) {
+        return;
+      }
+      demoBadge.textContent = '입력 신호 없음 · 데모 진행 중';
+      addFeed('데모 시작');
+
+      const demoText = '개념을 정리하고 있습니다. 핵심 포인트를 먼저 잡고, 드로잉에 필요한 구조를 빠르게 스케치합니다.';
+      let textIndex = 0;
+      let drawingProgress = 0;
+      const textTimer = setInterval(() => {
+        if (textIndex < demoText.length) {
+          const nextChunk = demoText.slice(textIndex, textIndex + 4);
+          textIndex += 4;
+          handleAgentEvent({
+            type: 'text_delta',
+            payload: { delta: nextChunk }
+          }, { local: true });
+        } else {
+          clearInterval(textTimer);
+          handleAgentEvent({ type: 'text_done' }, { local: true });
+        }
+      }, 140);
+
+      const drawingTimer = setInterval(() => {
+        drawingProgress += 4;
+        handleAgentEvent({
+          type: 'draw_progress',
+          payload: { progress: drawingProgress }
+        }, { local: true });
+        if (drawingProgress >= 100) {
+          clearInterval(drawingTimer);
+          handleAgentEvent({ type: 'draw_complete' }, { local: true });
+        }
+      }, 180);
+
+      const audioTimer = setTimeout(() => {
+        handleAgentEvent({ type: 'audio_status', payload: { state: 'requested' } }, { local: true });
+        setTimeout(() => {
+          handleAgentEvent({ type: 'audio_status', payload: { state: 'ready' } }, { local: true });
+        }, 800);
+      }, 400);
+
+      demoTimers.push(textTimer, drawingTimer, audioTimer);
+    }
+
     connectBtn.addEventListener('click', () => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.close();
       } else {
-        connect();
+        connectWebSocket();
       }
     });
 
-    // 정지 버튼
     stopBtn.addEventListener('click', () => {
       if (currentSource) {
         currentSource.stop();
         currentSource = null;
-        statusEl.textContent = '연결됨 - 음성 준비 완료';
-        statusEl.className = 'status connected';
+        handleAgentEvent({ type: 'audio_status', payload: { state: 'ready' } }, { local: true });
         stopBtn.disabled = true;
-        addLog('재생 정지');
+        addFeed('오디오 정지');
       }
     });
 
-    // 테스트 버튼
-    testBtn.addEventListener('click', () => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        addLog('먼저 서버에 연결해주세요');
-        return;
-      }
+    demoBtn.addEventListener('click', () => {
+      stopDemoRun();
+      hasRealEvents = false;
+      startDemoRun();
+    });
 
-      const text = testText.value.trim();
+    volumeSlider.addEventListener('input', (event) => {
+      const value = event.target.value;
+      volumeValue.textContent = `${value}%`;
+    });
+
+    sendBtn.addEventListener('click', async () => {
+      const text = chatInput.value.trim();
       if (!text) {
-        addLog('텍스트를 입력해주세요');
         return;
       }
-
-      addLog(`TTS 요청: ${text.substring(0, 50)}...`);
-      ws.send(JSON.stringify({ text }));
+      addChatMessage('user', text);
+      addFeed('사용자 메시지', '전송됨');
+      chatInput.value = '';
+      try {
+        await fetch('/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'chat_message',
+            payload: { role: 'user', text }
+          })
+        });
+      } catch (error) {
+        addFeed('메시지 전송 실패');
+      }
     });
 
-    // 자동 연결
     window.addEventListener('load', () => {
-      addLog('페이지 로드 완료');
-      setTimeout(connect, 500);
+      setStatus('연결 준비', false);
+      updateStreamText('');
+      connectWebSocket();
+      connectEventStream();
+      scheduleDemoRun();
     });
+
+    if (excalidrawFrame) {
+      excalidrawFrame.addEventListener('load', () => {
+        canvasStatus.textContent = '캔버스 로드됨';
+        addFeed('캔버스 로드 완료');
+      });
+    }
   </script>
 </body>
 </html>

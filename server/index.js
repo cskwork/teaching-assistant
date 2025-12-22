@@ -6,11 +6,36 @@ const path = require('path');
 
 const app = express();
 const PORT = 3334;
+let wss;
+const sseClients = new Set();
 
 // 미들웨어 설정
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+function sendSse(res, payload) {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+function broadcastEvent(event) {
+  const payload = {
+    ...event,
+    ts: Date.now()
+  };
+
+  sseClients.forEach((res) => {
+    sendSse(res, payload);
+  });
+
+  if (wss) {
+    wss.clients.forEach((client) => {
+      if (client.readyState === 1) {
+        client.send(JSON.stringify({ event: payload }));
+      }
+    });
+  }
+}
 
 // Gemini TTS API 설정
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -97,6 +122,40 @@ function broadcastAudio(wavBuffer) {
   return clientCount;
 }
 
+// 에이전트 이벤트 스트림 (SSE)
+app.get('/events', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive'
+  });
+  res.flushHeaders();
+
+  sendSse(res, { type: 'connected' });
+  sseClients.add(res);
+
+  const keepAlive = setInterval(() => {
+    res.write(':\n\n');
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    sseClients.delete(res);
+  });
+});
+
+// 에이전트 이벤트 수신 (외부 오케스트레이터용)
+app.post('/events', (req, res) => {
+  const { type, payload } = req.body;
+
+  if (!type) {
+    return res.status(400).json({ error: 'type이 필요합니다' });
+  }
+
+  broadcastEvent({ type, payload });
+  return res.json({ ok: true });
+});
+
 // TTS 엔드포인트
 app.post('/tts', async (req, res) => {
   try {
@@ -107,6 +166,13 @@ app.post('/tts', async (req, res) => {
     }
 
     console.log(`TTS 요청 받음: ${text.substring(0, 50)}...`);
+    broadcastEvent({
+      type: 'audio_status',
+      payload: {
+        state: 'requested',
+        preview: text.substring(0, 80)
+      }
+    });
 
     const wavBuffer = await generateSpeech(text);
 
@@ -115,6 +181,15 @@ app.post('/tts', async (req, res) => {
     if (broadcast) {
       broadcastedTo = broadcastAudio(wavBuffer);
     }
+
+    broadcastEvent({
+      type: 'audio_status',
+      payload: {
+        state: 'ready',
+        bytes: wavBuffer.length,
+        clients: broadcastedTo
+      }
+    });
 
     res.set({
       'Content-Type': 'audio/wav',
@@ -125,6 +200,13 @@ app.post('/tts', async (req, res) => {
     console.log(`TTS 응답 전송 완료 (브로드캐스트: ${broadcastedTo}개 클라이언트)`);
   } catch (error) {
     console.error('TTS 오류:', error);
+    broadcastEvent({
+      type: 'audio_status',
+      payload: {
+        state: 'error',
+        message: error.message
+      }
+    });
     res.status(500).json({ error: error.message });
   }
 });
@@ -144,7 +226,7 @@ const server = app.listen(PORT, () => {
 });
 
 // WebSocket 서버 설정 (실시간 스트리밍용)
-const wss = new WebSocketServer({ server });
+wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
   console.log('WebSocket 클라이언트 연결됨');
@@ -154,12 +236,35 @@ wss.on('connection', (ws) => {
       const { text } = JSON.parse(message.toString());
       console.log(`WebSocket TTS 요청: ${text.substring(0, 50)}...`);
 
+      broadcastEvent({
+        type: 'audio_status',
+        payload: {
+          state: 'requested',
+          preview: text.substring(0, 80)
+        }
+      });
+
       const wavBuffer = await generateSpeech(text);
       ws.send(wavBuffer);
+
+      broadcastEvent({
+        type: 'audio_status',
+        payload: {
+          state: 'ready',
+          bytes: wavBuffer.length
+        }
+      });
 
       console.log('WebSocket TTS 응답 전송 완료');
     } catch (error) {
       console.error('WebSocket TTS 오류:', error);
+      broadcastEvent({
+        type: 'audio_status',
+        payload: {
+          state: 'error',
+          message: error.message
+        }
+      });
       ws.send(JSON.stringify({ error: error.message }));
     }
   });
