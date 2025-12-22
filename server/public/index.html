@@ -73,7 +73,7 @@
 
     .app {
       position: relative;
-      max-width: 1200px;
+      max-width: 1600px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
@@ -155,7 +155,7 @@
 
     .content {
       display: grid;
-      grid-template-columns: 1.4fr 1fr;
+      grid-template-columns: 1.6fr 1fr;
       grid-template-areas:
         "progress progress"
         "canvas chat";
@@ -222,6 +222,34 @@
       background: #e8f7f5;
       color: #1b7f73;
       border-color: rgba(42, 157, 143, 0.35);
+    }
+
+    .canvas-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .zoom-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      background: #f3f4f6;
+      color: var(--ink);
+    }
+
+    .zoom-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .zoom-range {
+      width: 120px;
     }
 
     .is-hidden {
@@ -383,7 +411,7 @@
     }
 
     .chat-body {
-      height: 380px;
+      height: 640px;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -423,35 +451,24 @@
       border: 1px solid var(--stroke);
       background: #fff;
       overflow: hidden;
-      height: 420px;
+      height: 640px;
     }
 
-    .canvas-shell iframe {
+    .canvas-shell canvas {
       width: 100%;
       height: 100%;
-      border: none;
+      display: block;
+      cursor: grab;
+    }
+
+    .canvas-shell.is-panning canvas {
+      cursor: grabbing;
     }
 
     .canvas-note {
       margin-top: 12px;
       font-size: 12px;
       color: var(--muted);
-    }
-
-    .chat-input {
-      display: flex;
-      gap: 12px;
-      margin-top: 14px;
-    }
-
-    .chat-input textarea {
-      flex: 1;
-      border-radius: 14px;
-      border: 1px solid var(--stroke);
-      padding: 10px 12px;
-      font-size: 14px;
-      resize: none;
-      min-height: 54px;
     }
 
     .chat-overlay {
@@ -516,7 +533,7 @@
       }
 
       .chat-body {
-        height: 320px;
+        height: 460px;
       }
     }
   </style>
@@ -623,12 +640,18 @@
             <h2>Excalidraw 캔버스</h2>
             <p class="muted">드로잉 진행 상황이 실시간으로 반영됩니다.</p>
           </div>
-          <div id="canvasStatus" class="status-pill">대기</div>
+          <div class="canvas-controls">
+            <button id="zoomOutBtn" class="zoom-btn">-</button>
+            <input id="zoomRange" class="zoom-range" type="range" min="50" max="200" value="100">
+            <button id="zoomInBtn" class="zoom-btn">+</button>
+            <button id="zoomResetBtn" class="zoom-btn">Reset</button>
+            <div id="canvasStatus" class="status-pill">대기</div>
+          </div>
         </div>
         <div class="canvas-shell">
-          <iframe id="excalidrawFrame" title="Excalidraw Canvas" src="http://localhost:3333"></iframe>
+          <canvas id="excalidrawPreview"></canvas>
         </div>
-        <p class="canvas-note">캔버스가 보이지 않으면 <a href="http://localhost:3333" target="_blank" rel="noreferrer">새 탭</a>에서 확인하세요.</p>
+        <p class="canvas-note">미리보기는 실제 드로잉 영역만 맞춰 보여줍니다. 전체 캔버스는 <a href="http://localhost:3333" target="_blank" rel="noreferrer">새 탭</a>에서 확인하세요.</p>
       </section>
 
       <section class="panel chat" id="chatPanel">
@@ -642,11 +665,6 @@
 
         <div id="chatBody" class="chat-body">
           <div id="typingBubble" class="bubble agent typing is-hidden"><p></p></div>
-        </div>
-
-        <div class="chat-input">
-          <textarea id="chatInput" placeholder="질문을 입력하세요..."></textarea>
-          <button id="sendBtn" class="btn primary">보내기</button>
         </div>
 
         <div id="chatOverlay" class="chat-overlay hidden">
@@ -697,12 +715,16 @@
     const audioStatus = document.getElementById('audioStatus');
 
     const canvasStatus = document.getElementById('canvasStatus');
-    const excalidrawFrame = document.getElementById('excalidrawFrame');
+    const excalidrawPreview = document.getElementById('excalidrawPreview');
+    const excalidrawCtx = excalidrawPreview ? excalidrawPreview.getContext('2d') : null;
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomResetBtn = document.getElementById('zoomResetBtn');
+    const zoomRange = document.getElementById('zoomRange');
     const chatPanel = document.getElementById('chatPanel');
     const chatOverlay = document.getElementById('chatOverlay');
     const chatBody = document.getElementById('chatBody');
-    const chatInput = document.getElementById('chatInput');
-    const sendBtn = document.getElementById('sendBtn');
+    const canvasShell = document.querySelector('.canvas-shell');
     const typingBubble = document.getElementById('typingBubble');
     const typingText = typingBubble ? typingBubble.querySelector('p') : null;
 
@@ -710,6 +732,13 @@
     let hasRealEvents = false;
     let demoTimers = [];
     let demoMode = false;
+    let lastElementsHash = '';
+    let lastElements = [];
+    let zoomLevel = 1;
+    let panOffset = { x: 0, y: 0 };
+    let panStart = { x: 0, y: 0 };
+    let panOrigin = { x: 0, y: 0 };
+    let isPanning = false;
 
     function clamp(value) {
       return Math.max(0, Math.min(100, value));
@@ -770,6 +799,298 @@
         typingText.textContent = text;
         typingBubble.classList.toggle('is-hidden', !text);
         chatBody.scrollTop = chatBody.scrollHeight;
+      }
+    }
+
+    function resizePreviewCanvas() {
+      if (!excalidrawPreview) {
+        return;
+      }
+      const rect = excalidrawPreview.getBoundingClientRect();
+      excalidrawPreview.width = Math.max(1, Math.floor(rect.width * window.devicePixelRatio));
+      excalidrawPreview.height = Math.max(1, Math.floor(rect.height * window.devicePixelRatio));
+      if (excalidrawCtx) {
+        excalidrawCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+      }
+    }
+
+    function getElementBounds(element) {
+      const width = typeof element.width === 'number' ? element.width : 0;
+      const height = typeof element.height === 'number' ? element.height : 0;
+      const x = typeof element.x === 'number' ? element.x : 0;
+      const y = typeof element.y === 'number' ? element.y : 0;
+
+      if (Array.isArray(element.points) && element.points.length > 0) {
+        let minX = x;
+        let maxX = x;
+        let minY = y;
+        let maxY = y;
+        element.points.forEach((point) => {
+          const px = x + point[0];
+          const py = y + point[1];
+          minX = Math.min(minX, px);
+          maxX = Math.max(maxX, px);
+          minY = Math.min(minY, py);
+          maxY = Math.max(maxY, py);
+        });
+        return { minX, minY, maxX, maxY };
+      }
+
+      return {
+        minX: x,
+        minY: y,
+        maxX: x + width,
+        maxY: y + height
+      };
+    }
+
+    function getSceneBounds(elements) {
+      if (!elements.length) {
+        return null;
+      }
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      elements.forEach((element) => {
+        const bounds = getElementBounds(element);
+        minX = Math.min(minX, bounds.minX);
+        minY = Math.min(minY, bounds.minY);
+        maxX = Math.max(maxX, bounds.maxX);
+        maxY = Math.max(maxY, bounds.maxY);
+      });
+
+      if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+        return null;
+      }
+
+      return {
+        minX,
+        minY,
+        maxX,
+        maxY,
+        width: Math.max(1, maxX - minX),
+        height: Math.max(1, maxY - minY)
+      };
+    }
+
+    function drawTextBlock(ctx, text, x, y, width, fontSize, color, align) {
+      const lines = text.split('\\n');
+      ctx.font = `${fontSize}px \"Space Grotesk\", \"Avenir Next\", sans-serif`;
+      ctx.fillStyle = color || '#111827';
+      ctx.textAlign = align || 'left';
+      ctx.textBaseline = 'top';
+
+      const lineHeight = fontSize * 1.2;
+      lines.forEach((line, index) => {
+        let drawX = x;
+        if (ctx.textAlign === 'center') {
+          drawX = x + width / 2;
+        } else if (ctx.textAlign === 'right') {
+          drawX = x + width;
+        }
+        ctx.fillText(line, drawX, y + index * lineHeight);
+      });
+    }
+
+    function drawElement(ctx, element) {
+      const x = element.x || 0;
+      const y = element.y || 0;
+      const width = element.width || 0;
+      const height = element.height || 0;
+      const stroke = element.strokeColor || '#111827';
+      const fill = element.backgroundColor && element.backgroundColor !== 'transparent' ? element.backgroundColor : null;
+      const opacity = typeof element.opacity === 'number' ? element.opacity / 100 : 1;
+
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.lineWidth = element.strokeWidth || 2;
+      ctx.strokeStyle = stroke;
+
+      if (element.type === 'rectangle') {
+        if (fill) {
+          ctx.fillStyle = fill;
+          ctx.fillRect(x, y, width, height);
+        }
+        ctx.strokeRect(x, y, width, height);
+      } else if (element.type === 'ellipse') {
+        ctx.beginPath();
+        ctx.ellipse(x + width / 2, y + height / 2, Math.abs(width) / 2, Math.abs(height) / 2, 0, 0, Math.PI * 2);
+        if (fill) {
+          ctx.fillStyle = fill;
+          ctx.fill();
+        }
+        ctx.stroke();
+      } else if (element.type === 'diamond') {
+        ctx.beginPath();
+        ctx.moveTo(x + width / 2, y);
+        ctx.lineTo(x + width, y + height / 2);
+        ctx.lineTo(x + width / 2, y + height);
+        ctx.lineTo(x, y + height / 2);
+        ctx.closePath();
+        if (fill) {
+          ctx.fillStyle = fill;
+          ctx.fill();
+        }
+        ctx.stroke();
+      } else if (element.type === 'line' || element.type === 'arrow' || element.type === 'freedraw') {
+        if (Array.isArray(element.points) && element.points.length > 0) {
+          ctx.beginPath();
+          element.points.forEach((point, index) => {
+            const px = x + point[0];
+            const py = y + point[1];
+            if (index === 0) {
+              ctx.moveTo(px, py);
+            } else {
+              ctx.lineTo(px, py);
+            }
+          });
+          ctx.stroke();
+
+          if (element.type === 'arrow' && element.points.length > 1) {
+            const last = element.points[element.points.length - 1];
+            const prev = element.points[element.points.length - 2];
+            const endX = x + last[0];
+            const endY = y + last[1];
+            const startX = x + prev[0];
+            const startY = y + prev[1];
+            const angle = Math.atan2(endY - startY, endX - startX);
+            const size = 10;
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - size * Math.cos(angle - Math.PI / 6), endY - size * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(endX - size * Math.cos(angle + Math.PI / 6), endY - size * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fillStyle = stroke;
+            ctx.fill();
+          }
+        }
+      } else if (element.type === 'text' || element.type === 'label') {
+        const fontSize = element.fontSize || 18;
+        drawTextBlock(ctx, element.text || '', x, y, width, fontSize, stroke, element.textAlign);
+      }
+
+      if (element.label && element.label.text) {
+        const fontSize = element.fontSize || 18;
+        drawTextBlock(ctx, element.label.text, x, y + (height - fontSize) / 2, width, fontSize, stroke, 'center');
+      }
+
+      ctx.restore();
+    }
+
+    function renderPreview(elements) {
+      if (!excalidrawCtx || !excalidrawPreview) {
+        return;
+      }
+      resizePreviewCanvas();
+
+      const bounds = getSceneBounds(elements);
+      const width = excalidrawPreview.clientWidth;
+      const height = excalidrawPreview.clientHeight;
+
+      excalidrawCtx.clearRect(0, 0, width, height);
+      excalidrawCtx.fillStyle = '#ffffff';
+      excalidrawCtx.fillRect(0, 0, width, height);
+
+      if (!bounds) {
+        canvasStatus.textContent = '드로잉 없음';
+        return;
+      }
+
+      const padding = 12;
+      const availableWidth = Math.max(1, width - padding * 2);
+      const availableHeight = Math.max(1, height - padding * 2);
+      const baseScale = Math.min(availableWidth / bounds.width, availableHeight / bounds.height);
+      const scale = baseScale * zoomLevel;
+      const offsetX = padding + (availableWidth - bounds.width * scale) / 2 - bounds.minX * scale + panOffset.x;
+      const offsetY = padding + (availableHeight - bounds.height * scale) / 2 - bounds.minY * scale + panOffset.y;
+
+      excalidrawCtx.save();
+      excalidrawCtx.translate(offsetX, offsetY);
+      excalidrawCtx.scale(scale, scale);
+
+      elements.forEach((element) => drawElement(excalidrawCtx, element));
+
+      excalidrawCtx.restore();
+      canvasStatus.textContent = '표시 중';
+      canvasStatus.classList.add('ready');
+    }
+
+    function clampZoom(value) {
+      return Math.min(2, Math.max(0.5, value));
+    }
+
+    function setZoom(value) {
+      zoomLevel = clampZoom(value);
+      if (zoomRange) {
+        zoomRange.value = String(Math.round(zoomLevel * 100));
+      }
+      if (lastElements.length > 0) {
+        renderPreview(lastElements);
+      }
+    }
+
+    function beginPan(event) {
+      if (!excalidrawPreview) {
+        return;
+      }
+      if (event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      isPanning = true;
+      panStart = { x: event.clientX, y: event.clientY };
+      panOrigin = { x: panOffset.x, y: panOffset.y };
+      if (canvasShell) {
+        canvasShell.classList.add('is-panning');
+      }
+    }
+
+    function updatePan(event) {
+      if (!isPanning) {
+        return;
+      }
+      panOffset = {
+        x: panOrigin.x + (event.clientX - panStart.x),
+        y: panOrigin.y + (event.clientY - panStart.y)
+      };
+      if (lastElements.length > 0) {
+        renderPreview(lastElements);
+      }
+    }
+
+    function endPan() {
+      if (!isPanning) {
+        return;
+      }
+      isPanning = false;
+      if (canvasShell) {
+        canvasShell.classList.remove('is-panning');
+      }
+    }
+
+    async function fetchExcalidrawElements() {
+      if (!excalidrawPreview) {
+        return;
+      }
+      try {
+        const response = await fetch('http://localhost:3333/api/elements');
+        if (!response.ok) {
+          throw new Error('요청 실패');
+        }
+        const data = await response.json();
+        const rawElements = Array.isArray(data.elements) ? data.elements : [];
+        const elements = rawElements.filter((element) => !element.isDeleted);
+        const hash = JSON.stringify(elements.map((element) => [element.id, element.version, element.updatedAt]));
+        if (hash !== lastElementsHash) {
+          lastElementsHash = hash;
+          lastElements = elements;
+          renderPreview(elements);
+        }
+      } catch (error) {
+        canvasStatus.textContent = '불러오기 실패';
+        canvasStatus.classList.remove('ready');
       }
     }
 
@@ -1092,27 +1413,44 @@
       volumeValue.textContent = `${value}%`;
     });
 
-    sendBtn.addEventListener('click', async () => {
-      const text = chatInput.value.trim();
-      if (!text) {
-        return;
-      }
-      addChatMessage('user', text);
-      addFeed('사용자 메시지', '전송됨');
-      chatInput.value = '';
-      try {
-        await fetch('/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'chat_message',
-            payload: { role: 'user', text }
-          })
-        });
-      } catch (error) {
-        addFeed('메시지 전송 실패');
-      }
-    });
+    if (zoomRange) {
+      zoomRange.addEventListener('input', (event) => {
+        const value = Number(event.target.value) / 100;
+        setZoom(value);
+      });
+    }
+
+    if (zoomOutBtn) {
+      zoomOutBtn.addEventListener('click', () => {
+        setZoom(zoomLevel - 0.1);
+      });
+    }
+
+    if (zoomInBtn) {
+      zoomInBtn.addEventListener('click', () => {
+        setZoom(zoomLevel + 0.1);
+      });
+    }
+
+    if (zoomResetBtn) {
+      zoomResetBtn.addEventListener('click', () => {
+        panOffset = { x: 0, y: 0 };
+        setZoom(1);
+      });
+    }
+
+    if (excalidrawPreview) {
+      excalidrawPreview.addEventListener('mousedown', beginPan);
+      excalidrawPreview.addEventListener('mousemove', updatePan);
+      excalidrawPreview.addEventListener('mouseleave', endPan);
+      excalidrawPreview.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        const delta = event.deltaY < 0 ? 0.08 : -0.08;
+        setZoom(zoomLevel + delta);
+      }, { passive: false });
+    }
+
+    window.addEventListener('mouseup', endPan);
 
     window.addEventListener('load', () => {
       setStatus('연결 준비', false);
@@ -1122,14 +1460,17 @@
       connectWebSocket();
       connectEventStream();
       scheduleDemoRun();
+      resizePreviewCanvas();
+      fetchExcalidrawElements();
+      setZoom(1);
     });
 
-    if (excalidrawFrame) {
-      excalidrawFrame.addEventListener('load', () => {
-        canvasStatus.textContent = '캔버스 로드됨';
-        addFeed('캔버스 로드 완료');
-      });
-    }
+    window.addEventListener('resize', () => {
+      resizePreviewCanvas();
+      fetchExcalidrawElements();
+    });
+
+    setInterval(fetchExcalidrawElements, 2000);
   </script>
 </body>
 </html>

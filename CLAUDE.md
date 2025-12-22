@@ -209,6 +209,10 @@ curl -d '{"text": "안녕하세요"}' # 특수문자 제거
 
 curl에서 `-d "$(cat <<'EOF' ... EOF)"` 형태로 보낼 때, JSON 문자열 앞에 줄바꿈이나 들여쓰기가 들어가면 `Expected property name or '}'` 오류가 발생할 수 있다. 가장 안전한 방법은 `-d @- <<'EOF'` 형태로 JSON 한 줄만 전달하는 것이다.
 
+## TTS 서버 연결 실패 (curl exit code 7)
+
+curl 요청이 exit code 7이면 `localhost:3334`가 응답하지 않는 상태다. 해결은 `./scripts/start-all.sh`로 서버를 실행하고 브라우저에서 `http://localhost:3334` 탭이 열려 있는지 확인한다.
+
 ## Excalidraw 캔버스 시작 실패 원인
 
 start-all 스크립트에서 npx tsx 실행이 대화형 확인 프롬프트에 막히면 캔버스가 시작되지 않는다.
@@ -228,4 +232,8 @@ start-all 스크립트에서 npx tsx 실행이 대화형 확인 프롬프트에 
 
 SSE와 WebSocket에서 동일한 이벤트를 동시에 보내면 UI가 중복 수신해 문장이 두 번씩 붙는다.
 해결은 이벤트는 SSE로만 보내고 WebSocket은 오디오 바이너리 전송에만 사용한다.
+
+## Excalidraw 드로잉 크롭 표시 방법
+
+Excalidraw 서버의 `GET /api/elements`를 읽어 요소 경계 박스를 계산한 뒤 캔버스에 직접 렌더링하면 여백 없이 드로잉만 보여줄 수 있다.
 </insight>

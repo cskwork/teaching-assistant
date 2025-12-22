@@ -157,7 +157,9 @@ Browser interface with:
 - Event stream updates via SSE
 - WebSocket audio playback
 - Live chat panel unlocked after drawing completion
-- Embedded Excalidraw canvas preview
+- Cropped Excalidraw preview rendered from `/api/elements`
+- Preview zoom controls with mouse wheel support
+- Preview pan with click-and-drag
 
 ## Color Coding
 
