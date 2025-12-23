@@ -536,6 +536,116 @@
         height: 460px;
       }
     }
+
+    /* TalkingHead floating container */
+    .talking-head-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 280px;
+      height: 320px;
+      z-index: 1000;
+      border-radius: 20px;
+      overflow: hidden;
+      background: linear-gradient(145deg, rgba(255,255,255,0.95), rgba(245,247,250,0.9));
+      border: 1px solid rgba(255,255,255,0.8);
+      box-shadow: 0 20px 60px rgba(31, 41, 55, 0.15), 0 8px 20px rgba(31, 41, 55, 0.1);
+      backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
+    }
+
+    .talking-head-container #talkingHeadAvatar {
+      width: 100%;
+      height: 100%;
+    }
+
+    .talking-head-container #talkingHeadAvatar canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+
+    .talking-head-status {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(42, 157, 143, 0.15);
+      color: #1b7f73;
+      pointer-events: none;
+    }
+
+    .talking-head-container.speaking .talking-head-status {
+      background: rgba(255, 122, 89, 0.15);
+      color: #9a3412;
+    }
+
+    .talking-head-minimize {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.9);
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      line-height: 28px;
+      z-index: 10;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: transform 0.2s ease;
+    }
+
+    .talking-head-minimize:hover {
+      transform: scale(1.1);
+    }
+
+    .talking-head-container.minimized {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+    }
+
+    .talking-head-container.minimized #talkingHeadAvatar,
+    .talking-head-container.minimized .talking-head-status {
+      display: none;
+    }
+
+    .talking-head-container.minimized .talking-head-minimize {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .talking-head-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .talking-head-loading .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--stroke);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -679,7 +789,162 @@
       </section>
 
     </section>
+
+    <!-- TalkingHead Avatar (floating) -->
+    <div id="talkingHeadContainer" class="talking-head-container">
+      <button id="talkingHeadMinimize" class="talking-head-minimize">-</button>
+      <div id="talkingHeadLoading" class="talking-head-loading">
+        <div class="spinner"></div>
+        <span>Loading avatar...</span>
+      </div>
+      <div id="talkingHeadAvatar"></div>
+      <span id="talkingHeadStatus" class="talking-head-status">Ready</span>
+    </div>
   </main>
+
+  <!-- TalkingHead importmap -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <!-- TalkingHead module -->
+  <script type="module">
+    import { TalkingHead } from 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.7/modules/talkinghead.mjs';
+
+    // Avatar URL with required morph targets
+    const AVATAR_URL = 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown&textureSizeLimit=1024&textureFormat=png';
+
+    let talkingHead = null;
+    let avatarReady = false;
+
+    async function initTalkingHead() {
+      const container = document.getElementById('talkingHeadAvatar');
+      const loadingEl = document.getElementById('talkingHeadLoading');
+      const statusEl = document.getElementById('talkingHeadStatus');
+
+      if (!container) return;
+
+      try {
+        // TalkingHead 인스턴스 생성
+        talkingHead = new TalkingHead(container, {
+          ttsEndpoint: null,
+          cameraView: 'head',
+          cameraDistance: 0.6,
+          cameraX: 0,
+          cameraY: 0,
+          cameraRotateX: 0,
+          cameraRotateY: 0,
+          lightAmbientColor: 0xffffff,
+          lightAmbientIntensity: 2,
+          lightDirectColor: 0x8888aa,
+          lightDirectIntensity: 30,
+          lightDirectPhi: 1,
+          lightDirectTheta: 2,
+          lightSpotIntensity: 0,
+          modelPixelRatio: 1,
+          modelFPS: 30,
+          lookAtCamera: 500,
+          lookAtMouse: 1000
+        });
+
+        // 아바타 로드
+        await talkingHead.showAvatar({
+          url: AVATAR_URL,
+          body: 'F',
+          avatarMood: 'neutral',
+          lipsyncLang: 'en'
+        }, (ev) => {
+          if (ev.lengthComputable) {
+            const pct = Math.round((ev.loaded / ev.total) * 100);
+            if (loadingEl) {
+              loadingEl.querySelector('span').textContent = `Loading ${pct}%`;
+            }
+          }
+        });
+
+        avatarReady = true;
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (statusEl) statusEl.textContent = 'Ready';
+
+        console.log('[TalkingHead] Avatar loaded successfully');
+
+      } catch (error) {
+        console.error('[TalkingHead] Init error:', error);
+        if (loadingEl) {
+          loadingEl.querySelector('span').textContent = 'Load failed';
+        }
+      }
+    }
+
+    // 오디오 재생 시 lip-sync 실행
+    window.speakWithAvatar = async function(audioBuffer, text) {
+      if (!talkingHead || !avatarReady) return;
+
+      const container = document.getElementById('talkingHeadContainer');
+      const statusEl = document.getElementById('talkingHeadStatus');
+
+      try {
+        container?.classList.add('speaking');
+        if (statusEl) statusEl.textContent = 'Speaking';
+
+        // 단어별 타이밍 추정 (균등 분배)
+        const words = text ? text.split(/\s+/).filter(w => w.length > 0) : [''];
+        const duration = audioBuffer.duration * 1000;
+        const wordDuration = duration / Math.max(1, words.length);
+        const wtimes = words.map((_, i) => i * wordDuration);
+        const wdurations = words.map(() => wordDuration * 0.9);
+
+        await talkingHead.speakAudio(audioBuffer, {
+          words: words,
+          wtimes: wtimes,
+          wdurations: wdurations
+        });
+
+      } catch (error) {
+        console.error('[TalkingHead] Speak error:', error);
+      } finally {
+        container?.classList.remove('speaking');
+        if (statusEl) statusEl.textContent = 'Ready';
+      }
+    };
+
+    // Speaking 상태 업데이트
+    window.updateAvatarSpeakingState = function(speaking) {
+      const container = document.getElementById('talkingHeadContainer');
+      const statusEl = document.getElementById('talkingHeadStatus');
+      if (container) {
+        container.classList.toggle('speaking', speaking);
+      }
+      if (statusEl) {
+        statusEl.textContent = speaking ? 'Speaking' : 'Ready';
+      }
+    };
+
+    // TalkingHead 인스턴스 접근
+    window.getTalkingHead = function() {
+      return { instance: talkingHead, ready: avatarReady };
+    };
+
+    // 페이지 로드 시 초기화
+    window.addEventListener('load', () => {
+      initTalkingHead();
+    });
+
+    // Minimize 토글
+    document.getElementById('talkingHeadMinimize')?.addEventListener('click', () => {
+      const container = document.getElementById('talkingHeadContainer');
+      const btn = document.getElementById('talkingHeadMinimize');
+      if (container) {
+        container.classList.toggle('minimized');
+        if (btn) btn.textContent = container.classList.contains('minimized') ? '+' : '-';
+      }
+    });
+  </script>
 
   <script>
     let ws = null;
@@ -729,6 +994,7 @@
     const typingText = typingBubble ? typingBubble.querySelector('p') : null;
 
     let streamBuffer = '';
+    let lastSpokenText = '';  // TalkingHead용 마지막 TTS 텍스트
     let hasRealEvents = false;
     let demoTimers = [];
     let demoMode = false;
@@ -1288,10 +1554,23 @@
       gainNode.connect(analyser);
       currentSource.start(0);
 
+      // TalkingHead lip-sync 트리거
+      lastSpokenText = streamBuffer || lastSpokenText;
+      if (typeof window.speakWithAvatar === 'function') {
+        window.speakWithAvatar(audioBuffer, lastSpokenText);
+      }
+      if (typeof window.updateAvatarSpeakingState === 'function') {
+        window.updateAvatarSpeakingState(true);
+      }
+
       handleAgentEvent({ type: 'audio_status', payload: { state: 'playing' } }, { local: true });
 
       currentSource.onended = () => {
         currentSource = null;
+        // TalkingHead 상태 업데이트
+        if (typeof window.updateAvatarSpeakingState === 'function') {
+          window.updateAvatarSpeakingState(false);
+        }
         handleAgentEvent({ type: 'audio_status', payload: { state: 'ready' } }, { local: true });
       };
     }
@@ -1396,6 +1675,15 @@
       if (currentSource) {
         currentSource.stop();
         currentSource = null;
+        // TalkingHead 상태 업데이트
+        if (typeof window.updateAvatarSpeakingState === 'function') {
+          window.updateAvatarSpeakingState(false);
+        }
+        // TalkingHead 말하기 중단
+        const th = typeof window.getTalkingHead === 'function' ? window.getTalkingHead() : null;
+        if (th && th.instance && th.ready) {
+          try { th.instance.stopSpeaking(); } catch (e) { /* ignore */ }
+        }
         handleAgentEvent({ type: 'audio_status', payload: { state: 'ready' } }, { local: true });
         stopBtn.disabled = true;
         addFeed('오디오 정지');
