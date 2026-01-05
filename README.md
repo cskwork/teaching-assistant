@@ -37,15 +37,16 @@ Multi-modal teaching workflow combining visual (Excalidraw) and audio (Gemini TT
 - Node.js 18+
 - Claude Code CLI
 - Excalidraw MCP server (already configured in `.mcp.json`)
-- Gemini API key ([Get one here](https://ai.google.dev/))
+- Gemini API key (optional, required for TTS audio) ([Get one here](https://ai.google.dev/))
 
 ### Installation
 
-1. **Configure API Key**:
+1. **Configure API Key (optional)**:
    ```bash
    cp .env.example .env
    # Edit .env and add your GEMINI_API_KEY
    ```
+   If you skip this step, the system still starts but TTS audio will be disabled.
 
 2. **Install Dependencies**:
    ```bash
@@ -71,6 +72,7 @@ This will:
 - Start TTS Server on port 3334
 - Install dependencies if needed
 - Create necessary directories
+- If GEMINI_API_KEY is not set, TTS audio is disabled but the UI still runs
 
 ### Open Live Session UI
 
@@ -200,14 +202,14 @@ Format:
    lsof -ti:3334
    ```
 
-2. Verify GEMINI_API_KEY is set:
-   ```bash
-   grep GEMINI_API_KEY .env
-   ```
-
-3. Check server logs:
+2. Check server logs:
    ```bash
    tail -f tts-server.log
+   ```
+
+3. If you need audio, verify GEMINI_API_KEY is set:
+   ```bash
+   grep GEMINI_API_KEY .env
    ```
 
 ### Excalidraw Not Connecting
@@ -225,9 +227,10 @@ Format:
 ### No Audio Playing
 
 1. Ensure browser is connected to WebSocket
-2. Check browser console for errors
-3. Verify Gemini API key is valid
-4. Check server logs for TTS errors
+2. If the UI shows TTS disabled, set GEMINI_API_KEY and restart
+3. Check browser console for errors
+4. Verify Gemini API key is valid
+5. Check server logs for TTS errors
 
 ## Screen Sessions
 
@@ -259,6 +262,8 @@ screen -S tts-server -X quit
 ## API Reference
 
 ### Gemini TTS
+
+**Requirement**: `GEMINI_API_KEY` must be set to enable audio. Without it, the server runs but returns 503 for TTS requests.
 
 **Endpoint**:
 ```

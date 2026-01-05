@@ -91,6 +91,7 @@ function streamTextEvents(text, durationSeconds) {
 // Gemini TTS API 설정
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_TTS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent';
+const TTS_DISABLED_MESSAGE = 'GEMINI_API_KEY가 설정되지 않아 TTS가 비활성화되었습니다';
 
 // Base64 PCM을 WAV로 변환하는 함수
 function pcmToWav(base64Pcm) {
@@ -133,10 +134,28 @@ function getWavDurationSeconds(wavBuffer) {
   return totalSamples / sampleRate;
 }
 
+function handleTtsDisabled(text) {
+  broadcastEvent({
+    type: 'audio_status',
+    payload: {
+      state: 'disabled',
+      message: TTS_DISABLED_MESSAGE
+    }
+  });
+
+  if (text) {
+    setTimeout(() => {
+      streamTextEvents(text);
+    }, 120);
+  }
+}
+
 // TTS API 호출 함수
 async function generateSpeech(text) {
   if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY가 설정되지 않았습니다');
+    const error = new Error(TTS_DISABLED_MESSAGE);
+    error.code = 'TTS_DISABLED';
+    throw error;
   }
 
   const response = await fetch(GEMINI_TTS_ENDPOINT, {
@@ -228,6 +247,12 @@ app.post('/tts', async (req, res) => {
       return res.status(400).json({ error: '텍스트가 필요합니다' });
     }
 
+    if (!GEMINI_API_KEY) {
+      console.warn('TTS 비활성화: GEMINI_API_KEY 없음');
+      handleTtsDisabled(text);
+      return res.status(503).json({ error: TTS_DISABLED_MESSAGE });
+    }
+
     console.log(`TTS 요청 받음: ${text.substring(0, 50)}...`);
     broadcastEvent({
       type: 'audio_status',
@@ -283,7 +308,8 @@ app.post('/tts', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    apiKeyConfigured: !!GEMINI_API_KEY
+    apiKeyConfigured: !!GEMINI_API_KEY,
+    ttsEnabled: !!GEMINI_API_KEY
   });
 });
 
@@ -302,6 +328,18 @@ wss.on('connection', (ws) => {
   ws.on('message', async (message) => {
     try {
       const { text } = JSON.parse(message.toString());
+      if (!text) {
+        ws.send(JSON.stringify({ error: '텍스트가 필요합니다' }));
+        return;
+      }
+
+      if (!GEMINI_API_KEY) {
+        console.warn('TTS 비활성화: GEMINI_API_KEY 없음');
+        handleTtsDisabled(text);
+        ws.send(JSON.stringify({ error: TTS_DISABLED_MESSAGE }));
+        return;
+      }
+
       console.log(`WebSocket TTS 요청: ${text.substring(0, 50)}...`);
 
       broadcastEvent({

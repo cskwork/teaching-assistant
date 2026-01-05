@@ -398,6 +398,16 @@
       flex: 1;
     }
 
+    .tts-notice {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 122, 89, 0.35);
+      background: #fff3e6;
+      color: #9a3412;
+      font-size: 12px;
+    }
+
     .visualizer {
       height: 50px;
       background: #eef2f7;
@@ -738,6 +748,7 @@
             <input type="range" id="volume" min="0" max="100" value="80">
             <span id="volumeValue">80%</span>
           </div>
+          <div id="ttsNotice" class="tts-notice is-hidden">TTS 비활성화: GEMINI_API_KEY가 필요합니다.</div>
           <div class="visualizer">
             <canvas id="visualizer"></canvas>
           </div>
@@ -978,6 +989,7 @@
     const audioProgressBar = document.getElementById('audioProgressBar');
     const audioProgressValue = document.getElementById('audioProgressValue');
     const audioStatus = document.getElementById('audioStatus');
+    const ttsNotice = document.getElementById('ttsNotice');
 
     const canvasStatus = document.getElementById('canvasStatus');
     const excalidrawPreview = document.getElementById('excalidrawPreview');
@@ -1438,11 +1450,22 @@
           generating: { label: '생성 중', value: 55 },
           ready: { label: '준비됨', value: 80 },
           playing: { label: '재생 중', value: 100 },
+          disabled: { label: '비활성화', value: 0 },
           error: { label: '오류', value: 100 }
         };
         const entry = mapping[state] || { label: '대기 중', value: 0 };
         updateProgress(audioProgressBar, audioProgressValue, entry.value);
         audioStatus.textContent = entry.label;
+        if (ttsNotice) {
+          if (state === 'disabled') {
+            if (event.payload && event.payload.message) {
+              ttsNotice.textContent = event.payload.message;
+            }
+            ttsNotice.classList.remove('is-hidden');
+          } else {
+            ttsNotice.classList.add('is-hidden');
+          }
+        }
         addFeed('오디오 상태', entry.label);
       }
 
@@ -1457,6 +1480,26 @@
 
       if (event.type === 'log' && event.payload && event.payload.message) {
         addFeed(event.payload.message);
+      }
+    }
+
+    async function checkTtsHealth() {
+      if (!ttsNotice) {
+        return;
+      }
+      try {
+        const response = await fetch('/health');
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        if (data && data.apiKeyConfigured === false) {
+          ttsNotice.classList.remove('is-hidden');
+          audioStatus.textContent = '비활성화';
+          updateProgress(audioProgressBar, audioProgressValue, 0);
+        }
+      } catch (error) {
+        return;
       }
     }
 
@@ -1747,6 +1790,7 @@
       chatStatus.classList.add('ready');
       connectWebSocket();
       connectEventStream();
+      checkTtsHealth();
       scheduleDemoRun();
       resizePreviewCanvas();
       fetchExcalidrawElements();

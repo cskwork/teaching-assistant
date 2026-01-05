@@ -1,7 +1,8 @@
 #!/bin/bash
 # Excalidraw 캔버스 서버 시작 스크립트
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-EXCALIDRAW_ROOT="/Users/danny/Documents/PARA/Projects/mcp-excalidraw"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+EXCALIDRAW_ROOT="$PROJECT_ROOT/mcp-excalidraw-agent"
 PORT=3333
 
 # 기존 서버 종료

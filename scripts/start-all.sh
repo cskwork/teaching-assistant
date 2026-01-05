@@ -15,19 +15,9 @@ echo ""
 
 # .env 파일 확인
 if [ ! -f "$PROJECT_DIR/.env" ]; then
-    echo "⚠️  경고: .env 파일이 없습니다."
-    echo "   GEMINI_API_KEY를 설정해주세요."
+    echo "경고: .env 파일이 없습니다."
+    echo "GEMINI_API_KEY가 없으면 TTS는 비활성화됩니다."
     echo ""
-    read -p ".env.example을 생성하시겠습니까? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        cat > "$PROJECT_DIR/.env" << EOF
-# Gemini API Key for TTS
-GEMINI_API_KEY=your_api_key_here
-EOF
-        echo "✓ .env 파일이 생성되었습니다. API 키를 입력해주세요."
-        exit 0
-    fi
 fi
 
 # Node.js 의존성 확인

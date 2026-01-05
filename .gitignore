@@ -19,3 +19,6 @@ transcripts/*.md
 
 # Screen sessions
 .screen/
+
+# Cloned MCP server (use git submodule or clone separately)
+mcp-excalidraw-agent/

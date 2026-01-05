@@ -2,7 +2,7 @@
   "mcpServers": {
     "excalidraw": {
       "command": "node",
-      "args": ["/Users/danny/Documents/PARA/Projects/mcp-excalidraw/mcp_excalidraw/dist/index.js"],
+      "args": ["./mcp-excalidraw-agent/mcp_excalidraw/dist/index.js"],
       "env": {
         "EXPRESS_SERVER_URL": "http://localhost:3333",
         "ENABLE_CANVAS_SYNC": "true"
