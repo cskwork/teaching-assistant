@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git clone:*)"
+      "Bash(git clone:*)",
+      "mcp__context7__query-docs",
+      "Skill(planning-with-files)"
     ]
   }
 }

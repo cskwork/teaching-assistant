@@ -1489,16 +1489,11 @@
       }
       setChatSendingState(true);
       try {
-        const response = await fetch('/events', {
+        // Claude Chat 엔드포인트로 전송
+        const response = await fetch('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'chat_message',
-            payload: {
-              role: 'user',
-              text: trimmed
-            }
-          })
+          body: JSON.stringify({ message: trimmed })
         });
         if (!response.ok) {
           throw new Error('전송 실패');

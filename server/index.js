@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const { WebSocketServer } = require('ws');
 const path = require('path');
+const fs = require('fs');
+const Anthropic = require('@anthropic-ai/sdk');
 
 const app = express();
 const PORT = 3334;
@@ -92,6 +94,26 @@ function streamTextEvents(text, durationSeconds) {
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_TTS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent';
 const TTS_DISABLED_MESSAGE = 'GEMINI_API_KEY가 설정되지 않아 TTS가 비활성화되었습니다';
+
+// Claude API 설정 (OAuth 사용)
+let systemPrompt = '';
+let conversationHistory = [];
+
+// Anthropic 클라이언트 초기화 (OAuth/기본 인증 사용)
+const anthropic = new Anthropic();
+
+// 시스템 프롬프트 로드
+const SYSTEM_PROMPT_PATH = path.join(__dirname, '../temp/CLAUDE.md');
+function loadSystemPrompt() {
+  try {
+    systemPrompt = fs.readFileSync(SYSTEM_PROMPT_PATH, 'utf-8');
+    console.log('시스템 프롬프트 로드 완료: temp/CLAUDE.md');
+  } catch (err) {
+    console.warn('시스템 프롬프트 로드 실패:', err.message);
+    systemPrompt = 'You are a helpful teaching assistant. Respond in Korean.';
+  }
+}
+loadSystemPrompt();
 
 // Base64 PCM을 WAV로 변환하는 함수
 function pcmToWav(base64Pcm) {
@@ -304,12 +326,79 @@ app.post('/tts', async (req, res) => {
   }
 });
 
+// Claude Chat 엔드포인트
+app.post('/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: '메시지가 필요합니다' });
+    }
+
+    console.log(`Chat 요청 받음: ${message.substring(0, 50)}...`);
+
+    // 사용자 메시지를 히스토리에 추가
+    conversationHistory.push({ role: 'user', content: message });
+
+    // 사용자 메시지 브로드캐스트
+    broadcastEvent({
+      type: 'chat_message',
+      payload: { role: 'user', text: message }
+    });
+
+    // Claude 스트리밍 응답
+    let fullResponse = '';
+    const stream = anthropic.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: conversationHistory
+    }).on('text', (text) => {
+      fullResponse += text;
+      broadcastEvent({
+        type: 'text_delta',
+        payload: { delta: text, progress: null }
+      });
+    });
+
+    await stream.finalMessage();
+
+    // 어시스턴트 응답을 히스토리에 추가
+    conversationHistory.push({ role: 'assistant', content: fullResponse });
+
+    // 완료 브로드캐스트
+    broadcastEvent({ type: 'text_done' });
+    broadcastEvent({
+      type: 'chat_message',
+      payload: { role: 'agent', text: fullResponse }
+    });
+
+    console.log(`Chat 응답 완료: ${fullResponse.length}자`);
+    res.json({ ok: true, response: fullResponse });
+  } catch (error) {
+    console.error('Chat 오류:', error);
+    broadcastEvent({
+      type: 'chat_error',
+      payload: { message: error.message }
+    });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 대화 초기화 엔드포인트
+app.post('/chat/reset', (req, res) => {
+  conversationHistory = [];
+  console.log('대화 히스토리 초기화됨');
+  res.json({ ok: true, message: '대화가 초기화되었습니다' });
+});
+
 // 헬스 체크 엔드포인트
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     apiKeyConfigured: !!GEMINI_API_KEY,
-    ttsEnabled: !!GEMINI_API_KEY
+    ttsEnabled: !!GEMINI_API_KEY,
+    claudeEnabled: true
   });
 });
 
