@@ -93,6 +93,66 @@
       backdrop-filter: blur(12px);
     }
 
+    .chat-input-panel {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 22px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .chat-input-panel h2 {
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+
+    .chat-input-form {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .chat-input {
+      flex: 1;
+      min-height: 44px;
+      max-height: 120px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      background: #fff;
+      font-size: 14px;
+      line-height: 1.4;
+      resize: vertical;
+    }
+
+    .chat-send {
+      border: none;
+      border-radius: 12px;
+      padding: 10px 18px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent-2);
+      color: #fff;
+      box-shadow: 0 8px 16px rgba(42, 157, 143, 0.3);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .chat-send:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .chat-send:hover:not(:disabled) {
+      transform: translateY(-2px);
+    }
+
     .eyebrow {
       text-transform: uppercase;
       letter-spacing: 0.24em;
@@ -542,6 +602,16 @@
         align-items: flex-start;
       }
 
+      .chat-input-panel {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .chat-input-form {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
       .chat-body {
         height: 460px;
       }
@@ -562,6 +632,53 @@
       box-shadow: 0 20px 60px rgba(31, 41, 55, 0.15), 0 8px 20px rgba(31, 41, 55, 0.1);
       backdrop-filter: blur(12px);
       transition: all 0.3s ease;
+    }
+
+    .talking-head-controls {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--stroke);
+      box-shadow: 0 6px 14px rgba(31, 41, 55, 0.12);
+      z-index: 12;
+    }
+
+    .talking-head-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .talking-head-select {
+      border: 1px solid var(--stroke);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .talking-head-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .talking-head-btn:hover {
+      filter: brightness(0.96);
     }
 
     .talking-head-container #talkingHeadAvatar {
@@ -623,7 +740,9 @@
     }
 
     .talking-head-container.minimized #talkingHeadAvatar,
-    .talking-head-container.minimized .talking-head-status {
+    .talking-head-container.minimized .talking-head-status,
+    .talking-head-container.minimized .talking-head-controls,
+    .talking-head-container.minimized .talking-head-loading {
       display: none;
     }
 
@@ -641,6 +760,10 @@
       text-align: center;
       color: var(--muted);
       font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
     }
 
     .talking-head-loading .spinner {
@@ -678,6 +801,17 @@
         <button id="stopBtn" class="btn ghost" disabled>오디오 정지</button>
       </div>
     </header>
+
+    <section class="chat-input-panel">
+      <div>
+        <h2>사용자 입력</h2>
+        <p class="muted">메시지를 보내면 모든 클라이언트에 공유됩니다.</p>
+      </div>
+      <form id="chatInputForm" class="chat-input-form">
+        <textarea id="chatInput" class="chat-input" rows="2" placeholder="질문이나 요청을 입력하세요. (Enter: 전송, Shift+Enter: 줄바꿈)"></textarea>
+        <button id="chatSendBtn" class="chat-send" type="submit">보내기</button>
+      </form>
+    </section>
 
     <section class="content">
       <section class="panel live">
@@ -803,10 +937,15 @@
 
     <!-- TalkingHead Avatar (floating) -->
     <div id="talkingHeadContainer" class="talking-head-container">
+      <div class="talking-head-controls">
+        <label class="talking-head-label" for="avatarSelect">캐릭터</label>
+        <select id="avatarSelect" class="talking-head-select"></select>
+        <button id="avatarAddBtn" class="talking-head-btn" type="button">추가</button>
+      </div>
       <button id="talkingHeadMinimize" class="talking-head-minimize">-</button>
       <div id="talkingHeadLoading" class="talking-head-loading">
         <div class="spinner"></div>
-        <span>Loading avatar...</span>
+        <span>아바타 로딩 중</span>
       </div>
       <div id="talkingHeadAvatar"></div>
       <span id="talkingHeadStatus" class="talking-head-status">Ready</span>
@@ -827,18 +966,300 @@
   <script type="module">
     import { TalkingHead } from 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.7/modules/talkinghead.mjs';
 
-    // Avatar URL with required morph targets
-    const AVATAR_URL = 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown&textureSizeLimit=1024&textureFormat=png';
+    const MORPH_TARGETS = 'ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown';
+    const DEFAULT_AVATAR_ID = 'character-2';
+    const STORAGE_KEYS = {
+      selectedAvatarId: 'talkingHead.selectedAvatarId',
+      customAvatars: 'talkingHead.customAvatars'
+    };
+    const AVATAR_PRESETS = [
+      {
+        id: 'character-2',
+        name: '연구원 · 침착',
+        url: 'https://models.readyplayer.me/KJIXZB.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown',
+        settings: { body: 'M', avatarMood: 'neutral', lipsyncLang: 'en' }
+      },
+      {
+        id: 'teacher-bright',
+        name: '교사 · 활기',
+        url: 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown&textureSizeLimit=1024&textureFormat=png',
+        settings: { body: 'F', avatarMood: 'happy', lipsyncLang: 'en' }
+      },
+      {
+        id: 'character-3',
+        name: '멘토 · 단정',
+        url: 'https://models.readyplayer.me/65a8dba831b23abb4f401bae.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown',
+        settings: { body: 'F', avatarMood: 'neutral', lipsyncLang: 'en' }
+      },
+      {
+        id: 'character-5',
+        name: '코치 · 밝음',
+        url: 'https://models.readyplayer.me/67be034c9fab1c21c486eb14.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown',
+        settings: { body: 'M', avatarMood: 'happy', lipsyncLang: 'en' }
+      }
+    ];
 
     let talkingHead = null;
     let avatarReady = false;
+    let currentAvatarId = null;
+    let pendingAvatarId = null;
+    let isAvatarLoading = false;
+    let customAvatars = [];
+    let avatarSelect = null;
+    let avatarAddBtn = null;
+    let loadingEl = null;
+    let statusEl = null;
+
+    function withRequiredMorphTargets(url) {
+      if (!url) {
+        return '';
+      }
+      if (url.includes('morphTargets=')) {
+        return url;
+      }
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}morphTargets=${encodeURIComponent(MORPH_TARGETS)}&textureSizeLimit=1024&textureFormat=png`;
+    }
+
+    function loadCustomAvatars() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.customAvatars);
+        if (!raw) {
+          return [];
+        }
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          return [];
+        }
+        return parsed
+          .filter((entry) => entry && entry.id && entry.name && entry.url)
+          .map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            url: entry.url,
+            settings: entry.settings || {}
+          }));
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveCustomAvatars(avatars) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.customAvatars, JSON.stringify(avatars));
+      } catch (error) {
+        return;
+      }
+    }
+
+    function getAllAvatars() {
+      return [...AVATAR_PRESETS, ...customAvatars];
+    }
+
+    function getAvatarById(id) {
+      return getAllAvatars().find((avatar) => avatar.id === id);
+    }
+
+    function resolveInitialAvatar() {
+      const savedId = localStorage.getItem(STORAGE_KEYS.selectedAvatarId);
+      const savedAvatar = savedId ? getAvatarById(savedId) : null;
+      if (savedAvatar) {
+        return savedAvatar;
+      }
+      const fallback = getAvatarById(DEFAULT_AVATAR_ID);
+      return fallback || AVATAR_PRESETS[0];
+    }
+
+    function renderAvatarSelect(selectedId) {
+      if (!avatarSelect) {
+        return;
+      }
+      avatarSelect.innerHTML = '';
+      getAllAvatars().forEach((avatar) => {
+        const option = document.createElement('option');
+        option.value = avatar.id;
+        option.textContent = avatar.name;
+        avatarSelect.appendChild(option);
+      });
+      if (selectedId) {
+        avatarSelect.value = selectedId;
+      }
+    }
+
+    function setLoadingState(isLoading, message) {
+      if (!loadingEl) {
+        return;
+      }
+      const label = loadingEl.querySelector('span');
+      if (label && message) {
+        label.textContent = message;
+      }
+      loadingEl.style.display = isLoading ? 'flex' : 'none';
+    }
+
+    function buildAvatarPayload(avatar) {
+      const settings = avatar.settings || {};
+      return {
+        url: withRequiredMorphTargets(avatar.url),
+        body: settings.body || 'F',
+        avatarMood: settings.avatarMood || 'neutral',
+        lipsyncLang: settings.lipsyncLang || 'en'
+      };
+    }
+
+    async function applyAvatar(avatar, options = {}) {
+      if (!talkingHead || !avatar) {
+        return false;
+      }
+      const { persistSelection = true } = options;
+      isAvatarLoading = true;
+      avatarReady = false;
+      const container = document.getElementById('talkingHeadContainer');
+      if (container) {
+        container.classList.remove('speaking');
+      }
+      if (typeof talkingHead.stopSpeaking === 'function') {
+        try {
+          talkingHead.stopSpeaking();
+        } catch (error) {
+        }
+      }
+      if (statusEl) {
+        statusEl.textContent = 'Loading';
+      }
+      setLoadingState(true, '아바타 로딩 중');
+
+      try {
+        await talkingHead.showAvatar(buildAvatarPayload(avatar), (ev) => {
+          if (ev.lengthComputable && loadingEl) {
+            const pct = Math.round((ev.loaded / ev.total) * 100);
+            setLoadingState(true, `로딩 ${pct}%`);
+          }
+        });
+
+        avatarReady = true;
+        currentAvatarId = avatar.id;
+        if (persistSelection) {
+          localStorage.setItem(STORAGE_KEYS.selectedAvatarId, avatar.id);
+        }
+        if (avatarSelect && avatarSelect.value !== avatar.id) {
+          avatarSelect.value = avatar.id;
+        }
+        setLoadingState(false, '');
+        if (statusEl) {
+          statusEl.textContent = 'Ready';
+        }
+        console.log('[TalkingHead] Avatar loaded successfully');
+        return true;
+      } catch (error) {
+        console.error('[TalkingHead] Avatar load error:', error);
+        if (statusEl) {
+          statusEl.textContent = 'Load failed';
+        }
+        setLoadingState(false, 'Load failed');
+        return false;
+      } finally {
+        isAvatarLoading = false;
+      }
+    }
+
+    async function switchAvatar(avatar) {
+      if (!avatar) {
+        return;
+      }
+      if (isAvatarLoading) {
+        pendingAvatarId = avatar.id;
+        return;
+      }
+
+      const previousId = currentAvatarId;
+      const success = await applyAvatar(avatar, { persistSelection: true });
+
+      if (!success && previousId) {
+        const previousAvatar = getAvatarById(previousId);
+        if (previousAvatar) {
+          await applyAvatar(previousAvatar, { persistSelection: true });
+          if (avatarSelect) {
+            avatarSelect.value = previousId;
+          }
+        }
+      }
+
+      if (pendingAvatarId && pendingAvatarId !== currentAvatarId) {
+        const nextAvatar = getAvatarById(pendingAvatarId);
+        pendingAvatarId = null;
+        if (nextAvatar) {
+          await switchAvatar(nextAvatar);
+        }
+      }
+    }
+
+    function promptForCustomAvatar() {
+      const name = window.prompt('새 캐릭터 이름을 입력하세요.', '새 캐릭터');
+      if (!name || !name.trim()) {
+        return null;
+      }
+      const url = window.prompt('GLB URL을 입력하세요. (morphTargets 포함 권장)', '');
+      if (!url || !url.trim()) {
+        return null;
+      }
+      const body = window.prompt('body 값 (F 또는 M)', 'F') || 'F';
+      const avatarMood = window.prompt('avatarMood 값', 'neutral') || 'neutral';
+      const lipsyncLang = window.prompt('lipsyncLang 값', 'en') || 'en';
+      return {
+        id: `custom-${Date.now()}`,
+        name: name.trim(),
+        url: withRequiredMorphTargets(url.trim()),
+        settings: {
+          body: body.trim(),
+          avatarMood: avatarMood.trim(),
+          lipsyncLang: lipsyncLang.trim()
+        }
+      };
+    }
+
+    function setupAvatarControls() {
+      customAvatars = loadCustomAvatars();
+      const initialAvatar = resolveInitialAvatar();
+      renderAvatarSelect(initialAvatar.id);
+
+      if (avatarSelect) {
+        avatarSelect.addEventListener('change', () => {
+          const selected = getAvatarById(avatarSelect.value);
+          if (selected) {
+            switchAvatar(selected);
+          }
+        });
+      }
+
+      if (avatarAddBtn) {
+        avatarAddBtn.addEventListener('click', () => {
+          const customAvatar = promptForCustomAvatar();
+          if (!customAvatar) {
+            return;
+          }
+          customAvatars = [...customAvatars, customAvatar];
+          saveCustomAvatars(customAvatars);
+          renderAvatarSelect(customAvatar.id);
+          switchAvatar(customAvatar);
+        });
+      }
+
+      return initialAvatar;
+    }
 
     async function initTalkingHead() {
       const container = document.getElementById('talkingHeadAvatar');
-      const loadingEl = document.getElementById('talkingHeadLoading');
-      const statusEl = document.getElementById('talkingHeadStatus');
+      loadingEl = document.getElementById('talkingHeadLoading');
+      statusEl = document.getElementById('talkingHeadStatus');
+      avatarSelect = document.getElementById('avatarSelect');
+      avatarAddBtn = document.getElementById('avatarAddBtn');
 
-      if (!container) return;
+      if (!container) {
+        return;
+      }
+
+      const initialAvatar = setupAvatarControls();
 
       try {
         // TalkingHead 인스턴스 생성
@@ -863,41 +1284,20 @@
           lookAtMouse: 1000
         });
 
-        // 아바타 로드
-        await talkingHead.showAvatar({
-          url: AVATAR_URL,
-          body: 'F',
-          avatarMood: 'neutral',
-          lipsyncLang: 'en'
-        }, (ev) => {
-          if (ev.lengthComputable) {
-            const pct = Math.round((ev.loaded / ev.total) * 100);
-            if (loadingEl) {
-              loadingEl.querySelector('span').textContent = `Loading ${pct}%`;
-            }
-          }
-        });
-
-        avatarReady = true;
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (statusEl) statusEl.textContent = 'Ready';
-
-        console.log('[TalkingHead] Avatar loaded successfully');
-
+        await applyAvatar(initialAvatar, { persistSelection: true });
       } catch (error) {
         console.error('[TalkingHead] Init error:', error);
         if (loadingEl) {
-          loadingEl.querySelector('span').textContent = 'Load failed';
+          setLoadingState(true, 'Load failed');
         }
       }
     }
 
     // 오디오 재생 시 lip-sync 실행
     window.speakWithAvatar = async function(audioBuffer, text) {
-      if (!talkingHead || !avatarReady) return;
+      if (!talkingHead || !avatarReady || isAvatarLoading) return;
 
       const container = document.getElementById('talkingHeadContainer');
-      const statusEl = document.getElementById('talkingHeadStatus');
 
       try {
         container?.classList.add('speaking');
@@ -920,14 +1320,16 @@
         console.error('[TalkingHead] Speak error:', error);
       } finally {
         container?.classList.remove('speaking');
-        if (statusEl) statusEl.textContent = 'Ready';
+        if (statusEl && !isAvatarLoading) statusEl.textContent = 'Ready';
       }
     };
 
     // Speaking 상태 업데이트
     window.updateAvatarSpeakingState = function(speaking) {
       const container = document.getElementById('talkingHeadContainer');
-      const statusEl = document.getElementById('talkingHeadStatus');
+      if (isAvatarLoading) {
+        return;
+      }
       if (container) {
         container.classList.toggle('speaking', speaking);
       }
@@ -968,6 +1370,9 @@
     const connectBtn = document.getElementById('connectBtn');
     const demoBtn = document.getElementById('demoBtn');
     const stopBtn = document.getElementById('stopBtn');
+    const chatInputForm = document.getElementById('chatInputForm');
+    const chatInput = document.getElementById('chatInput');
+    const chatSendBtn = document.getElementById('chatSendBtn');
     const volumeSlider = document.getElementById('volume');
     const volumeValue = document.getElementById('volumeValue');
     const demoBadge = document.getElementById('demoBadge');
@@ -1069,6 +1474,44 @@
         chatBody.appendChild(bubble);
       }
       chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function setChatSendingState(sending) {
+      if (chatSendBtn) {
+        chatSendBtn.disabled = sending;
+      }
+    }
+
+    async function sendUserChatMessage(text) {
+      const trimmed = text.trim();
+      if (!trimmed) {
+        return;
+      }
+      setChatSendingState(true);
+      try {
+        const response = await fetch('/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'chat_message',
+            payload: {
+              role: 'user',
+              text: trimmed
+            }
+          })
+        });
+        if (!response.ok) {
+          throw new Error('전송 실패');
+        }
+        if (chatInput) {
+          chatInput.value = '';
+        }
+        addFeed('사용자 메시지 전송', `${trimmed.length}자`);
+      } catch (error) {
+        addFeed('메시지 전송 실패');
+      } finally {
+        setChatSendingState(false);
+      }
     }
 
     function updateStreamText(text) {
@@ -1704,6 +2147,20 @@
       }, 400);
 
       demoTimers.push(textTimer, drawingTimer, audioTimer);
+    }
+
+    if (chatInputForm && chatInput) {
+      chatInputForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        sendUserChatMessage(chatInput.value);
+      });
+
+      chatInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          sendUserChatMessage(chatInput.value);
+        }
+      });
     }
 
     connectBtn.addEventListener('click', () => {
