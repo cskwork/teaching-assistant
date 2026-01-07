@@ -1293,35 +1293,75 @@
       }
     }
 
-    // 오디오 재생 시 lip-sync 실행
-    window.speakWithAvatar = async function(audioBuffer, text) {
-      if (!talkingHead || !avatarReady || isAvatarLoading) return;
+    // 오디오 재생 시 lip-sync 실행 (간단한 입 애니메이션)
+    let lipSyncInterval = null;
+
+    window.speakWithAvatar = function(audioBuffer, text) {
+      console.log('[TalkingHead] speakWithAvatar called, duration:', audioBuffer?.duration);
+      if (!talkingHead || !avatarReady || isAvatarLoading) {
+        console.log('[TalkingHead] Skipping - not ready');
+        return;
+      }
 
       const container = document.getElementById('talkingHeadContainer');
+      container?.classList.add('speaking');
+      if (statusEl) statusEl.textContent = 'Speaking';
 
-      try {
-        container?.classList.add('speaking');
-        if (statusEl) statusEl.textContent = 'Speaking';
+      // 기존 애니메이션 정리
+      if (lipSyncInterval) {
+        clearInterval(lipSyncInterval);
+      }
 
-        // 단어별 타이밍 추정 (균등 분배)
-        const words = text ? text.split(/\s+/).filter(w => w.length > 0) : [''];
-        const duration = audioBuffer.duration * 1000;
-        const wordDuration = duration / Math.max(1, words.length);
-        const wtimes = words.map((_, i) => i * wordDuration);
-        const wdurations = words.map(() => wordDuration * 0.9);
+      // 간단한 입 움직임 애니메이션 (viseme 기반)
+      const visemes = ['aa', 'E', 'I', 'O', 'U', 'PP', 'FF', 'TH', 'SS'];
+      let frame = 0;
+      const duration = (audioBuffer?.duration || 2) * 1000;
 
-        await talkingHead.speakAudio(audioBuffer, {
-          words: words,
-          wtimes: wtimes,
-          wdurations: wdurations
+      console.log('[TalkingHead] Starting lip animation for', duration, 'ms');
+
+      lipSyncInterval = setInterval(() => {
+        if (talkingHead && avatarReady) {
+          // 랜덤 viseme 선택하여 자연스러운 입 움직임
+          const viseme = visemes[Math.floor(Math.random() * visemes.length)];
+          const intensity = 0.3 + Math.random() * 0.5;
+          try {
+            talkingHead.setMorphTarget('viseme_' + viseme, intensity);
+          } catch (e) {
+            // viseme가 없을 수 있음
+          }
+        }
+        frame++;
+      }, 80);
+
+      // duration 후 애니메이션 종료
+      setTimeout(() => {
+        if (lipSyncInterval) {
+          clearInterval(lipSyncInterval);
+          lipSyncInterval = null;
+        }
+        // 입 다물기
+        visemes.forEach(v => {
+          try {
+            talkingHead?.setMorphTarget('viseme_' + v, 0);
+          } catch (e) {}
         });
-
-      } catch (error) {
-        console.error('[TalkingHead] Speak error:', error);
-      } finally {
         container?.classList.remove('speaking');
         if (statusEl && !isAvatarLoading) statusEl.textContent = 'Ready';
+        console.log('[TalkingHead] Lip animation ended');
+      }, duration);
+    };
+
+    window.stopAvatarSpeaking = function() {
+      if (lipSyncInterval) {
+        clearInterval(lipSyncInterval);
+        lipSyncInterval = null;
       }
+      const visemes = ['aa', 'E', 'I', 'O', 'U', 'PP', 'FF', 'TH', 'SS'];
+      visemes.forEach(v => {
+        try {
+          talkingHead?.setMorphTarget('viseme_' + v, 0);
+        } catch (e) {}
+      });
     };
 
     // Speaking 상태 업데이트
@@ -1476,7 +1516,10 @@
       chatBody.scrollTop = chatBody.scrollHeight;
     }
 
+    let isSendingMessage = false;
+
     function setChatSendingState(sending) {
+      isSendingMessage = sending;
       if (chatSendBtn) {
         chatSendBtn.disabled = sending;
       }
@@ -1486,6 +1529,10 @@
       const trimmed = text.trim();
       if (!trimmed) {
         console.log('[Chat] Empty message, skipping');
+        return;
+      }
+      if (isSendingMessage) {
+        console.log('[Chat] Already sending, ignoring duplicate');
         return;
       }
       console.log('[Chat] Sending to server:', trimmed.substring(0, 50));
@@ -1980,7 +2027,9 @@
       };
 
       ws.onmessage = async (event) => {
+        console.log('[WS] Message type:', event.data instanceof Blob ? 'Blob' : typeof event.data, event.data instanceof Blob ? `${event.data.size}B` : '');
         if (event.data instanceof Blob) {
+          console.log('[Audio] Received blob:', event.data.size, 'bytes');
           addFeed('오디오 수신', `${(event.data.size / 1024).toFixed(1)}KB`);
           stopBtn.disabled = false;
           await playAudio(event.data);
@@ -2016,16 +2065,20 @@
     }
 
     async function playAudio(audioBlob) {
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.connect(audioContext.destination);
-        visualize();
-      }
+      console.log('[Audio] playAudio called, blob size:', audioBlob.size);
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          analyser = audioContext.createAnalyser();
+          analyser.fftSize = 256;
+          analyser.connect(audioContext.destination);
+          visualize();
+        }
 
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        console.log('[Audio] ArrayBuffer size:', arrayBuffer.byteLength);
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        console.log('[Audio] Decoded, duration:', audioBuffer.duration, 's');
 
       if (currentSource) {
         currentSource.stop();
@@ -2035,45 +2088,43 @@
       // lip-sync용 텍스트 캡처
       lastSpokenText = streamBuffer || lastSpokenText;
 
-      // TalkingHead 아바타 사용 가능 여부 확인
-      const avatarState = typeof window.getTalkingHead === 'function' ? window.getTalkingHead() : null;
-      const useAvatar = avatarState && avatarState.ready && avatarState.instance;
+      // 항상 Web Audio API로 재생 (TalkingHead의 speakAudio가 불안정)
+      console.log('[Audio] Playing via Web Audio API');
+      currentSource = audioContext.createBufferSource();
+      currentSource.buffer = audioBuffer;
 
-      if (useAvatar) {
-        // TalkingHead가 오디오 재생과 lip-sync 모두 처리
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = volumeSlider.value / 100;
+
+      currentSource.connect(gainNode);
+      gainNode.connect(analyser);
+      currentSource.start(0);
+
+      handleAgentEvent({ type: 'audio_status', payload: { state: 'playing' } }, { local: true });
+
+      // TalkingHead lip-sync만 트리거 (오디오 재생은 Web Audio가 담당)
+      const avatarState = typeof window.getTalkingHead === 'function' ? window.getTalkingHead() : null;
+      if (avatarState && avatarState.ready && avatarState.instance) {
         if (typeof window.updateAvatarSpeakingState === 'function') {
           window.updateAvatarSpeakingState(true);
         }
-        handleAgentEvent({ type: 'audio_status', payload: { state: 'playing' } }, { local: true });
-
+        // TalkingHead에 오디오 버퍼 전달하여 lip-sync만 수행
         try {
-          await window.speakWithAvatar(audioBuffer, lastSpokenText);
-        } catch (error) {
-          console.error('[Audio] Avatar speak error:', error);
+          window.speakWithAvatar(audioBuffer, lastSpokenText);
+        } catch (e) {
+          console.error('[Audio] Lip-sync error:', e);
         }
+      }
 
+      currentSource.onended = () => {
+        currentSource = null;
         if (typeof window.updateAvatarSpeakingState === 'function') {
           window.updateAvatarSpeakingState(false);
         }
         handleAgentEvent({ type: 'audio_status', payload: { state: 'ready' } }, { local: true });
-      } else {
-        // 아바타 없을 때 fallback: Web Audio API로 재생
-        currentSource = audioContext.createBufferSource();
-        currentSource.buffer = audioBuffer;
-
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = volumeSlider.value / 100;
-
-        currentSource.connect(gainNode);
-        gainNode.connect(analyser);
-        currentSource.start(0);
-
-        handleAgentEvent({ type: 'audio_status', payload: { state: 'playing' } }, { local: true });
-
-        currentSource.onended = () => {
-          currentSource = null;
-          handleAgentEvent({ type: 'audio_status', payload: { state: 'ready' } }, { local: true });
-        };
+      };
+      } catch (error) {
+        console.error('[Audio] playAudio error:', error);
       }
     }
 

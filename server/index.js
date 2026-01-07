@@ -36,9 +36,20 @@ function broadcastEvent(event) {
     ts: Date.now()
   };
 
+  // SSE 클라이언트에 전송
   sseClients.forEach((res) => {
     sendSse(res, payload);
   });
+
+  // WebSocket 클라이언트에도 전송
+  if (wss) {
+    const wsPayload = JSON.stringify({ event: payload });
+    wss.clients.forEach((client) => {
+      if (client.readyState === 1) { // WebSocket.OPEN
+        client.send(wsPayload);
+      }
+    });
+  }
 }
 
 function stopTextStream() {
