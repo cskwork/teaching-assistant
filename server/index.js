@@ -4,7 +4,16 @@ const cors = require('cors');
 const { WebSocketServer } = require('ws');
 const path = require('path');
 const fs = require('fs');
-const Anthropic = require('@anthropic-ai/sdk');
+
+// Claude Agent SDK (ES module - 동적 import 사용)
+let queryFn = null;
+async function getQueryFn() {
+  if (!queryFn) {
+    const sdk = await import('@anthropic-ai/claude-agent-sdk');
+    queryFn = sdk.query;
+  }
+  return queryFn;
+}
 
 const app = express();
 const PORT = 3334;
@@ -95,12 +104,9 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_TTS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent';
 const TTS_DISABLED_MESSAGE = 'GEMINI_API_KEY가 설정되지 않아 TTS가 비활성화되었습니다';
 
-// Claude API 설정 (OAuth 사용)
+// Claude API 설정 (Agent SDK 사용 - API 키 불필요)
 let systemPrompt = '';
 let conversationHistory = [];
-
-// Anthropic 클라이언트 초기화 (OAuth/기본 인증 사용)
-const anthropic = new Anthropic();
 
 // 시스템 프롬프트 로드
 const SYSTEM_PROMPT_PATH = path.join(__dirname, '../temp/CLAUDE.md');
@@ -326,7 +332,7 @@ app.post('/tts', async (req, res) => {
   }
 });
 
-// Claude Chat 엔드포인트
+// Claude Chat 엔드포인트 (Agent SDK 사용)
 app.post('/chat', async (req, res) => {
   try {
     const { message } = req.body;
@@ -337,34 +343,41 @@ app.post('/chat', async (req, res) => {
 
     console.log(`Chat 요청 받음: ${message.substring(0, 50)}...`);
 
-    // 사용자 메시지를 히스토리에 추가
-    conversationHistory.push({ role: 'user', content: message });
-
     // 사용자 메시지 브로드캐스트
     broadcastEvent({
       type: 'chat_message',
       payload: { role: 'user', text: message }
     });
 
-    // Claude 스트리밍 응답
+    // Claude Agent SDK query() 사용
+    const query = await getQueryFn();
     let fullResponse = '';
-    const stream = anthropic.messages.stream({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: conversationHistory
-    }).on('text', (text) => {
-      fullResponse += text;
-      broadcastEvent({
-        type: 'text_delta',
-        payload: { delta: text, progress: null }
-      });
-    });
 
-    await stream.finalMessage();
-
-    // 어시스턴트 응답을 히스토리에 추가
-    conversationHistory.push({ role: 'assistant', content: fullResponse });
+    for await (const msg of query({
+      prompt: message,
+      options: {
+        allowedTools: [],
+        permissionMode: 'bypassPermissions',
+        systemPrompt: systemPrompt ? {
+          type: 'preset',
+          preset: 'default',
+          append: systemPrompt
+        } : undefined
+      }
+    })) {
+      // 텍스트 응답 스트리밍
+      if (msg.type === 'assistant' && msg.message?.content) {
+        for (const block of msg.message.content) {
+          if (block.type === 'text') {
+            fullResponse += block.text;
+            broadcastEvent({
+              type: 'text_delta',
+              payload: { delta: block.text, progress: null }
+            });
+          }
+        }
+      }
+    }
 
     // 완료 브로드캐스트
     broadcastEvent({ type: 'text_done' });

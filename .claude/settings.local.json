@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git clone:*)",
       "mcp__context7__query-docs",
-      "Skill(planning-with-files)"
+      "Skill(planning-with-files)",
+      "Bash(env)"
     ]
   }
 }

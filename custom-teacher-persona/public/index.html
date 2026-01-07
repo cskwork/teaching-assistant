@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Choose Your Teacher</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Choose Your Teacher</h1>
+      <p>Select a teaching style that works best for you</p>
+    </header>
+
+    <div class="teacher-grid" id="teacherGrid">
+      <!-- 선생님 카드가 여기에 동적으로 추가됨 -->
+    </div>
+  </div>
+
+  <script>
+    const icons = {
+      analogy: "🔗",
+      logical: "📐",
+      simple: "💡"
+    };
+
+    async function loadTeachers() {
+      const res = await fetch("/api/teachers");
+      const { teachers } = await res.json();
+
+      const grid = document.getElementById("teacherGrid");
+      grid.innerHTML = teachers.map(t => `
+        <a href="/chat/${t.id}" class="teacher-card">
+          <div class="teacher-icon ${t.id}">${icons[t.id] || "📚"}</div>
+          <div class="teacher-name">${t.name}</div>
+          <div class="teacher-desc">${t.description}</div>
+        </a>
+      `).join("");
+    }
+
+    loadTeachers();
+  </script>
+</body>
+</html>
