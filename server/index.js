@@ -118,13 +118,37 @@ const TTS_DISABLED_MESSAGE = 'GEMINI_API_KEY가 설정되지 않아 TTS가 비�
 // Claude API 설정 (Agent SDK 사용 - API 키 불필요)
 let systemPrompt = '';
 let conversationHistory = [];
+let excalidrawAvailable = false;
 
-// 시스템 프롬프트 로드
-const SYSTEM_PROMPT_PATH = path.join(__dirname, '../temp/CLAUDE.md');
+// Excalidraw 서버 상태 확인
+async function checkExcalidrawHealth() {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch('http://localhost:3333/api/elements', {
+      method: 'GET',
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    excalidrawAvailable = response.ok;
+    return excalidrawAvailable;
+  } catch (error) {
+    console.warn('Excalidraw 서버 연결 실패:', error.message);
+    excalidrawAvailable = false;
+    return false;
+  }
+}
+
+// 주기적으로 Excalidraw 상태 확인 (30초마다)
+setInterval(checkExcalidrawHealth, 30000);
+checkExcalidrawHealth(); // 시작 시 확인
+
+// 시스템 프롬프트 로드 (visual teaching prompt)
+const SYSTEM_PROMPT_PATH = path.join(__dirname, '../prompts/visual-teaching.md');
 function loadSystemPrompt() {
   try {
     systemPrompt = fs.readFileSync(SYSTEM_PROMPT_PATH, 'utf-8');
-    console.log('시스템 프롬프트 로드 완료: temp/CLAUDE.md');
+    console.log('시스템 프롬프트 로드 완료: prompts/visual-teaching.md');
   } catch (err) {
     console.warn('시스템 프롬프트 로드 실패:', err.message);
     systemPrompt = 'You are a helpful teaching assistant. Respond in Korean.';
@@ -190,7 +214,7 @@ function handleTtsDisabled(text) {
 }
 
 // TTS API 호출 함수
-async function generateSpeech(text) {
+async function generateSpeech(text, voice = 'Charon') {
   if (!GEMINI_API_KEY) {
     const error = new Error(TTS_DISABLED_MESSAGE);
     error.code = 'TTS_DISABLED';
@@ -212,7 +236,7 @@ async function generateSpeech(text) {
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
-              voiceName: 'Callirrhoe'
+              voiceName: voice
             }
           }
         }
@@ -346,13 +370,13 @@ app.post('/tts', async (req, res) => {
 // Claude Chat 엔드포인트 (Agent SDK 사용)
 app.post('/chat', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, voice } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: '메시지가 필요합니다' });
     }
 
-    console.log(`Chat 요청 받음: ${message.substring(0, 50)}...`);
+    console.log(`Chat 요청 받음: ${message.substring(0, 50)}... (voice: ${voice || 'default'})`);
 
     // 사용자 메시지 브로드캐스트
     broadcastEvent({
@@ -367,7 +391,12 @@ app.post('/chat', async (req, res) => {
     for await (const msg of query({
       prompt: message,
       options: {
-        allowedTools: [],
+        allowedTools: [
+          'mcp__excalidraw__batch_create_elements',
+          'mcp__excalidraw__create_from_mermaid',
+          'mcp__excalidraw__delete_element',
+          'mcp__excalidraw__query_elements'
+        ],
         permissionMode: 'bypassPermissions',
         systemPrompt: systemPrompt ? {
           type: 'preset',
@@ -386,6 +415,29 @@ app.post('/chat', async (req, res) => {
               payload: { delta: block.text, progress: null }
             });
           }
+        }
+      }
+
+      // Excalidraw 도구 사용 이벤트 처리
+      if (msg.type === 'tool_use') {
+        const toolName = msg.name || '';
+        if (toolName.includes('excalidraw')) {
+          broadcastEvent({
+            type: 'draw_progress',
+            payload: { progress: 50, tool: toolName, status: 'executing' }
+          });
+        }
+      }
+
+      // Excalidraw 도구 결과 이벤트 처리
+      if (msg.type === 'tool_result') {
+        const toolName = msg.tool_use_id || '';
+        if (toolName.includes('excalidraw') || msg.content?.toString().includes('element')) {
+          broadcastEvent({
+            type: 'draw_progress',
+            payload: { progress: 100, tool: 'excalidraw', status: 'completed' }
+          });
+          broadcastEvent({ type: 'draw_complete' });
         }
       }
     }
@@ -407,7 +459,7 @@ app.post('/chat', async (req, res) => {
             type: 'audio_status',
             payload: { state: 'generating', message: 'TTS 생성 중...' }
           });
-          const wavBuffer = await generateSpeech(fullResponse);
+          const wavBuffer = await generateSpeech(fullResponse, voice);
           const clientCount = broadcastAudio(wavBuffer);
           broadcastEvent({
             type: 'audio_status',
@@ -443,12 +495,14 @@ app.post('/chat/reset', (req, res) => {
 });
 
 // 헬스 체크 엔드포인트
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  const excalidrawStatus = await checkExcalidrawHealth();
   res.json({
     status: 'ok',
     apiKeyConfigured: !!GEMINI_API_KEY,
     ttsEnabled: !!GEMINI_API_KEY,
-    claudeEnabled: true
+    claudeEnabled: true,
+    excalidrawEnabled: excalidrawStatus
   });
 });
 

@@ -1006,25 +1006,29 @@
         id: 'character-2',
         name: '연구원 · 침착',
         url: 'https://models.readyplayer.me/KJIXZB.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown',
-        settings: { body: 'M', avatarMood: 'neutral', lipsyncLang: 'en' }
+        settings: { body: 'M', avatarMood: 'neutral', lipsyncLang: 'en' },
+        voice: 'Charon'
       },
       {
         id: 'teacher-bright',
         name: '교사 · 활기',
         url: 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown&textureSizeLimit=1024&textureFormat=png',
-        settings: { body: 'F', avatarMood: 'happy', lipsyncLang: 'en' }
+        settings: { body: 'F', avatarMood: 'happy', lipsyncLang: 'en' },
+        voice: 'Callirrhoe'
       },
       {
         id: 'character-3',
         name: '멘토 · 단정',
         url: 'https://models.readyplayer.me/65a8dba831b23abb4f401bae.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown',
-        settings: { body: 'F', avatarMood: 'neutral', lipsyncLang: 'en' }
+        settings: { body: 'F', avatarMood: 'neutral', lipsyncLang: 'en' },
+        voice: 'Charon'
       },
       {
         id: 'character-5',
         name: '코치 · 밝음',
         url: 'https://models.readyplayer.me/67be034c9fab1c21c486eb14.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown',
-        settings: { body: 'M', avatarMood: 'happy', lipsyncLang: 'en' }
+        settings: { body: 'M', avatarMood: 'happy', lipsyncLang: 'en' },
+        voice: 'Charon'
       }
     ];
 
@@ -1325,6 +1329,13 @@
     // 오디오 재생 시 lip-sync 실행 (간단한 입 애니메이션)
     let lipSyncInterval = null;
 
+    // 현재 아바타의 TTS 음성 반환
+    window.getCurrentAvatarVoice = function() {
+      const allAvatars = [...AVATAR_PRESETS, ...customAvatars];
+      const current = allAvatars.find(a => a.id === currentAvatarId);
+      return current?.voice || 'Charon';
+    };
+
     window.speakWithAvatar = function(audioBuffer, text) {
       console.log('[TalkingHead] speakWithAvatar called, duration:', audioBuffer?.duration);
       if (!talkingHead || !avatarReady || isAvatarLoading) {
@@ -1564,10 +1575,11 @@
       setChatSendingState(true);
       try {
         // Claude Chat 엔드포인트로 전송
+        const voice = window.getCurrentAvatarVoice ? window.getCurrentAvatarVoice() : 'Charon';
         const response = await fetch('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: trimmed })
+          body: JSON.stringify({ message: trimmed, voice })
         });
         console.log('[Chat] Response status:', response.status);
         if (!response.ok) {
@@ -1935,12 +1947,18 @@
         const progress = event.payload && typeof event.payload.progress === 'number'
           ? event.payload.progress
           : 0;
+        const toolName = event.payload?.tool || 'excalidraw';
+        const status = event.payload?.status || '';
         const current = updateProgress(drawingProgressBar, drawingProgressValue, progress);
-        drawingStatus.textContent = current >= 100 ? '완료' : '드로잉 진행 중';
+        drawingStatus.textContent = status === 'executing'
+          ? `${toolName.split('__').pop()} 실행 중...`
+          : (current >= 100 ? '완료' : '드로잉 진행 중');
         drawingOverlayBar.style.width = `${current}%`;
         drawingOverlayText.textContent = `${Math.round(current)}%`;
         canvasStatus.textContent = current >= 100 ? '완료' : '드로잉 중';
         canvasStatus.classList.toggle('ready', current >= 100);
+        // 즉시 캔버스 새로고침
+        fetchExcalidrawElements();
         if (current >= 100) {
           setChatReady(true);
         }
@@ -1955,6 +1973,8 @@
         canvasStatus.classList.add('ready');
         addFeed('드로잉 완료');
         setChatReady(true);
+        // 완료 시 캔버스 새로고침
+        fetchExcalidrawElements();
       }
 
       if (event.type === 'audio_status') {
