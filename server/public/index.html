@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Teaching Assistant - Live Session</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     :root {
       --ink: #1f2937;
@@ -515,6 +516,34 @@
       border-style: dashed;
       opacity: 0.85;
     }
+
+    /* 마크다운 렌더링 스타일 */
+    .bubble .message-content { line-height: 1.6; }
+    .bubble .message-content p { margin: 0 0 8px; }
+    .bubble .message-content p:last-child { margin-bottom: 0; }
+    .bubble .message-content code {
+      background: rgba(0,0,0,0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .bubble .message-content pre {
+      background: rgba(0,0,0,0.06);
+      padding: 10px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 8px 0;
+    }
+    .bubble .message-content pre code {
+      background: none;
+      padding: 0;
+    }
+    .bubble .message-content ul, .bubble .message-content ol {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+    .bubble .message-content strong { font-weight: 600; }
 
     .canvas-shell {
       border-radius: 18px;
@@ -1307,44 +1336,39 @@
       container?.classList.add('speaking');
       if (statusEl) statusEl.textContent = 'Speaking';
 
-      // 기존 애니메이션 정리
+      // Clear previous animation
       if (lipSyncInterval) {
         clearInterval(lipSyncInterval);
       }
 
-      // 간단한 입 움직임 애니메이션 (viseme 기반)
-      const visemes = ['aa', 'E', 'I', 'O', 'U', 'PP', 'FF', 'TH', 'SS'];
-      let frame = 0;
+      // Use TalkingHead setFixedValue API for mouth animation
+      const mouthShapes = ['mouthOpen', 'viseme_aa', 'viseme_O', 'viseme_E'];
       const duration = (audioBuffer?.duration || 2) * 1000;
 
       console.log('[TalkingHead] Starting lip animation for', duration, 'ms');
 
       lipSyncInterval = setInterval(() => {
         if (talkingHead && avatarReady) {
-          // 랜덤 viseme 선택하여 자연스러운 입 움직임
-          const viseme = visemes[Math.floor(Math.random() * visemes.length)];
-          const intensity = 0.3 + Math.random() * 0.5;
+          // Animate mouthOpen with varying intensity
+          const intensity = 0.2 + Math.random() * 0.4;
           try {
-            talkingHead.setMorphTarget('viseme_' + viseme, intensity);
+            talkingHead.setFixedValue('mouthOpen', intensity);
           } catch (e) {
-            // viseme가 없을 수 있음
+            console.log('[TalkingHead] setFixedValue error:', e.message);
           }
         }
-        frame++;
-      }, 80);
+      }, 100);
 
-      // duration 후 애니메이션 종료
+      // Stop animation after duration
       setTimeout(() => {
         if (lipSyncInterval) {
           clearInterval(lipSyncInterval);
           lipSyncInterval = null;
         }
-        // 입 다물기
-        visemes.forEach(v => {
-          try {
-            talkingHead?.setMorphTarget('viseme_' + v, 0);
-          } catch (e) {}
-        });
+        // Close mouth
+        try {
+          talkingHead?.setFixedValue('mouthOpen', 0);
+        } catch (e) {}
         container?.classList.remove('speaking');
         if (statusEl && !isAvatarLoading) statusEl.textContent = 'Ready';
         console.log('[TalkingHead] Lip animation ended');
@@ -1356,12 +1380,9 @@
         clearInterval(lipSyncInterval);
         lipSyncInterval = null;
       }
-      const visemes = ['aa', 'E', 'I', 'O', 'U', 'PP', 'FF', 'TH', 'SS'];
-      visemes.forEach(v => {
-        try {
-          talkingHead?.setMorphTarget('viseme_' + v, 0);
-        } catch (e) {}
-      });
+      try {
+        talkingHead?.setFixedValue('mouthOpen', 0);
+      } catch (e) {}
     };
 
     // Speaking 상태 업데이트
@@ -1502,12 +1523,16 @@
       }
     }
 
+    // 마크다운 파서 설정
+    marked.setOptions({ breaks: true, gfm: true });
+
     function addChatMessage(role, text) {
       const bubble = document.createElement('div');
       bubble.className = `bubble ${role}`;
-      const paragraph = document.createElement('p');
-      paragraph.textContent = text;
-      bubble.appendChild(paragraph);
+      const content = document.createElement('div');
+      content.className = 'message-content';
+      content.innerHTML = marked.parse(text);
+      bubble.appendChild(content);
       if (typingBubble) {
         chatBody.insertBefore(bubble, typingBubble);
       } else {
