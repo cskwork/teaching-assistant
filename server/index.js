@@ -143,6 +143,69 @@ async function checkExcalidrawHealth() {
 setInterval(checkExcalidrawHealth, 30000);
 checkExcalidrawHealth(); // 시작 시 확인
 
+// Excalidraw에 요소 그리기
+const EXCALIDRAW_API = 'http://localhost:3333/api/elements';
+
+async function drawOnExcalidraw(drawingData) {
+  if (!excalidrawAvailable) {
+    console.warn('Excalidraw 서버 사용 불가 - 그리기 건너뜀');
+    return false;
+  }
+
+  try {
+    // 캔버스 초기화 요청 시
+    if (drawingData.clear) {
+      const getRes = await fetch(EXCALIDRAW_API);
+      if (getRes.ok) {
+        const { elements } = await getRes.json();
+        for (const el of elements || []) {
+          await fetch(`${EXCALIDRAW_API}/${el.id}`, { method: 'DELETE' });
+        }
+      }
+    }
+
+    // 요소 배치 생성
+    if (drawingData.elements && drawingData.elements.length > 0) {
+      const response = await fetch(`${EXCALIDRAW_API}/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ elements: drawingData.elements })
+      });
+      if (!response.ok) {
+        throw new Error(`Batch create failed: ${response.status}`);
+      }
+      console.log(`Excalidraw: ${drawingData.elements.length}개 요소 생성됨`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Excalidraw 그리기 오류:', error.message);
+    return false;
+  }
+}
+
+// 응답에서 excalidraw 블록 파싱
+function parseExcalidrawBlocks(text) {
+  const regex = /```excalidraw\s*([\s\S]*?)```/g;
+  const blocks = [];
+  let cleanText = text;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    try {
+      const json = JSON.parse(match[1].trim());
+      blocks.push(json);
+    } catch (e) {
+      console.warn('Excalidraw JSON 파싱 실패:', e.message);
+    }
+  }
+
+  // excalidraw 블록 제거 (TTS용 텍스트)
+  cleanText = text.replace(/```excalidraw\s*[\s\S]*?```/g, '').trim();
+
+  return { blocks, cleanText };
+}
+
 // 시스템 프롬프트 로드 (visual teaching prompt)
 const SYSTEM_PROMPT_PATH = path.join(__dirname, '../prompts/visual-teaching.md');
 function loadSystemPrompt() {
@@ -391,12 +454,7 @@ app.post('/chat', async (req, res) => {
     for await (const msg of query({
       prompt: message,
       options: {
-        allowedTools: [
-          'mcp__excalidraw__batch_create_elements',
-          'mcp__excalidraw__create_from_mermaid',
-          'mcp__excalidraw__delete_element',
-          'mcp__excalidraw__query_elements'
-        ],
+        allowedTools: [],
         permissionMode: 'bypassPermissions',
         systemPrompt: systemPrompt ? {
           type: 'preset',
@@ -418,48 +476,51 @@ app.post('/chat', async (req, res) => {
         }
       }
 
-      // Excalidraw 도구 사용 이벤트 처리
-      if (msg.type === 'tool_use') {
-        const toolName = msg.name || '';
-        if (toolName.includes('excalidraw')) {
-          broadcastEvent({
-            type: 'draw_progress',
-            payload: { progress: 50, tool: toolName, status: 'executing' }
-          });
-        }
-      }
-
-      // Excalidraw 도구 결과 이벤트 처리
-      if (msg.type === 'tool_result') {
-        const toolName = msg.tool_use_id || '';
-        if (toolName.includes('excalidraw') || msg.content?.toString().includes('element')) {
-          broadcastEvent({
-            type: 'draw_progress',
-            payload: { progress: 100, tool: 'excalidraw', status: 'completed' }
-          });
-          broadcastEvent({ type: 'draw_complete' });
-        }
-      }
     }
 
     // 완료 브로드캐스트
     broadcastEvent({ type: 'text_done' });
+
+    // Excalidraw 블록 파싱 및 그리기
+    const { blocks: drawingBlocks, cleanText } = parseExcalidrawBlocks(fullResponse);
+
+    if (drawingBlocks.length > 0) {
+      broadcastEvent({
+        type: 'draw_progress',
+        payload: { progress: 30, tool: 'excalidraw', status: 'executing' }
+      });
+
+      for (const drawingData of drawingBlocks) {
+        const success = await drawOnExcalidraw(drawingData);
+        if (success) {
+          broadcastEvent({
+            type: 'draw_progress',
+            payload: { progress: 100, tool: 'excalidraw', status: 'completed' }
+          });
+        }
+      }
+      broadcastEvent({ type: 'draw_complete' });
+      console.log(`Excalidraw: ${drawingBlocks.length}개 드로잉 블록 처리됨`);
+    }
+
+    // 채팅 메시지 (excalidraw 블록 제거된 텍스트)
     broadcastEvent({
       type: 'chat_message',
-      payload: { role: 'agent', text: fullResponse }
+      payload: { role: 'agent', text: cleanText || fullResponse }
     });
 
-    console.log(`Chat 응답 완료: ${fullResponse.length}자`);
+    console.log(`Chat 응답 완료: ${fullResponse.length}자 (정제: ${cleanText.length}자)`);
 
-    // TTS 자동 생성 (비동기로 처리하여 응답 지연 방지)
-    if (GEMINI_API_KEY && fullResponse.trim()) {
+    // TTS 자동 생성 (excalidraw 블록 제거된 텍스트 사용)
+    const ttsText = cleanText || fullResponse;
+    if (GEMINI_API_KEY && ttsText.trim()) {
       (async () => {
         try {
           broadcastEvent({
             type: 'audio_status',
             payload: { state: 'generating', message: 'TTS 생성 중...' }
           });
-          const wavBuffer = await generateSpeech(fullResponse, voice);
+          const wavBuffer = await generateSpeech(ttsText, voice);
           const clientCount = broadcastAudio(wavBuffer);
           broadcastEvent({
             type: 'audio_status',
@@ -476,7 +537,7 @@ app.post('/chat', async (req, res) => {
       })();
     }
 
-    res.json({ ok: true, response: fullResponse });
+    res.json({ ok: true, response: cleanText || fullResponse });
   } catch (error) {
     console.error('Chat 오류:', error);
     broadcastEvent({
