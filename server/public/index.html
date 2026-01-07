@@ -1485,8 +1485,10 @@
     async function sendUserChatMessage(text) {
       const trimmed = text.trim();
       if (!trimmed) {
+        console.log('[Chat] Empty message, skipping');
         return;
       }
+      console.log('[Chat] Sending to server:', trimmed.substring(0, 50));
       setChatSendingState(true);
       try {
         // Claude Chat 엔드포인트로 전송
@@ -1495,14 +1497,19 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: trimmed })
         });
+        console.log('[Chat] Response status:', response.status);
         if (!response.ok) {
           throw new Error('전송 실패');
         }
+        const data = await response.json();
+        console.log('[Chat] Response received:', data.response?.substring(0, 50));
         if (chatInput) {
           chatInput.value = '';
+          chatInput.focus();
         }
         addFeed('사용자 메시지 전송', `${trimmed.length}자`);
       } catch (error) {
+        console.error('[Chat] Error:', error);
         addFeed('메시지 전송 실패');
       } finally {
         setChatSendingState(false);
@@ -1981,6 +1988,7 @@
         } else {
           try {
             const data = JSON.parse(event.data);
+            console.log('[WS] Received:', data.event?.type || data);
             if (data.error) {
               addFeed('오류', data.error);
               return;
@@ -1989,6 +1997,7 @@
               handleAgentEvent(data.event);
             }
           } catch (error) {
+            console.error('[WS] Parse error:', error);
             addFeed('메시지 파싱 실패');
           }
         }
@@ -2020,37 +2029,52 @@
 
       if (currentSource) {
         currentSource.stop();
-      }
-
-      currentSource = audioContext.createBufferSource();
-      currentSource.buffer = audioBuffer;
-
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = volumeSlider.value / 100;
-
-      currentSource.connect(gainNode);
-      gainNode.connect(analyser);
-      currentSource.start(0);
-
-      // TalkingHead lip-sync 트리거
-      lastSpokenText = streamBuffer || lastSpokenText;
-      if (typeof window.speakWithAvatar === 'function') {
-        window.speakWithAvatar(audioBuffer, lastSpokenText);
-      }
-      if (typeof window.updateAvatarSpeakingState === 'function') {
-        window.updateAvatarSpeakingState(true);
-      }
-
-      handleAgentEvent({ type: 'audio_status', payload: { state: 'playing' } }, { local: true });
-
-      currentSource.onended = () => {
         currentSource = null;
-        // TalkingHead 상태 업데이트
+      }
+
+      // lip-sync용 텍스트 캡처
+      lastSpokenText = streamBuffer || lastSpokenText;
+
+      // TalkingHead 아바타 사용 가능 여부 확인
+      const avatarState = typeof window.getTalkingHead === 'function' ? window.getTalkingHead() : null;
+      const useAvatar = avatarState && avatarState.ready && avatarState.instance;
+
+      if (useAvatar) {
+        // TalkingHead가 오디오 재생과 lip-sync 모두 처리
+        if (typeof window.updateAvatarSpeakingState === 'function') {
+          window.updateAvatarSpeakingState(true);
+        }
+        handleAgentEvent({ type: 'audio_status', payload: { state: 'playing' } }, { local: true });
+
+        try {
+          await window.speakWithAvatar(audioBuffer, lastSpokenText);
+        } catch (error) {
+          console.error('[Audio] Avatar speak error:', error);
+        }
+
         if (typeof window.updateAvatarSpeakingState === 'function') {
           window.updateAvatarSpeakingState(false);
         }
         handleAgentEvent({ type: 'audio_status', payload: { state: 'ready' } }, { local: true });
-      };
+      } else {
+        // 아바타 없을 때 fallback: Web Audio API로 재생
+        currentSource = audioContext.createBufferSource();
+        currentSource.buffer = audioBuffer;
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = volumeSlider.value / 100;
+
+        currentSource.connect(gainNode);
+        gainNode.connect(analyser);
+        currentSource.start(0);
+
+        handleAgentEvent({ type: 'audio_status', payload: { state: 'playing' } }, { local: true });
+
+        currentSource.onended = () => {
+          currentSource = null;
+          handleAgentEvent({ type: 'audio_status', payload: { state: 'ready' } }, { local: true });
+        };
+      }
     }
 
     function visualize() {
@@ -2150,6 +2174,7 @@
       chatInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
+          console.log('[Chat] Enter pressed, sending:', chatInput.value.substring(0, 50));
           sendUserChatMessage(chatInput.value);
         }
       });
