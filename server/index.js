@@ -387,6 +387,32 @@ app.post('/chat', async (req, res) => {
     });
 
     console.log(`Chat 응답 완료: ${fullResponse.length}자`);
+
+    // TTS 자동 생성 (비동기로 처리하여 응답 지연 방지)
+    if (GEMINI_API_KEY && fullResponse.trim()) {
+      (async () => {
+        try {
+          broadcastEvent({
+            type: 'audio_status',
+            payload: { state: 'generating', message: 'TTS 생성 중...' }
+          });
+          const wavBuffer = await generateSpeech(fullResponse);
+          const clientCount = broadcastAudio(wavBuffer);
+          broadcastEvent({
+            type: 'audio_status',
+            payload: { state: 'playing', message: `재생 중 (${clientCount}개 클라이언트)` }
+          });
+          console.log(`Chat TTS 브로드캐스트 완료: ${clientCount}개 클라이언트`);
+        } catch (err) {
+          console.error('Chat TTS 오류:', err.message);
+          broadcastEvent({
+            type: 'audio_status',
+            payload: { state: 'error', message: err.message }
+          });
+        }
+      })();
+    }
+
     res.json({ ok: true, response: fullResponse });
   } catch (error) {
     console.error('Chat 오류:', error);

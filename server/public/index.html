@@ -1845,9 +1845,6 @@
       }
 
       if (event.type === 'text_done') {
-        if (streamBuffer.trim()) {
-          addChatMessage('agent', streamBuffer.trim());
-        }
         streamBuffer = '';
         updateStreamText('');
         updateProgress(textProgressBar, textProgressValue, 100);
@@ -2241,7 +2238,7 @@
       chatStatus.textContent = '실시간';
       chatStatus.classList.add('ready');
       connectWebSocket();
-      connectEventStream();
+      // connectEventStream() 제거 - WebSocket이 이벤트와 오디오 모두 처리
       checkTtsHealth();
       scheduleDemoRun();
       resizePreviewCanvas();
