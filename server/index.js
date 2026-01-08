@@ -116,7 +116,6 @@ const GEMINI_TTS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/mo
 const TTS_DISABLED_MESSAGE = 'GEMINI_API_KEY가 설정되지 않아 TTS가 비활성화되었습니다';
 
 // Claude API 설정 (Agent SDK 사용 - API 키 불필요)
-let systemPrompt = '';
 let conversationHistory = [];
 let excalidrawAvailable = false;
 
@@ -206,17 +205,39 @@ function parseExcalidrawBlocks(text) {
   return { blocks, cleanText };
 }
 
-// 시스템 프롬프트 로드 (visual teaching prompt)
-const SYSTEM_PROMPT_PATH = path.join(__dirname, '../prompts/visual-teaching.md');
+// 시스템 프롬프트 로드 (visual teaching prompt - 기본값)
+const PROMPTS_DIR = path.join(__dirname, '../prompts');
+const DEFAULT_PROMPT_FILE = 'visual-teaching.md';
+let defaultSystemPrompt = '';
+
 function loadSystemPrompt() {
   try {
-    systemPrompt = fs.readFileSync(SYSTEM_PROMPT_PATH, 'utf-8');
-    console.log('시스템 프롬프트 로드 완료: prompts/visual-teaching.md');
+    defaultSystemPrompt = fs.readFileSync(path.join(PROMPTS_DIR, DEFAULT_PROMPT_FILE), 'utf-8');
+    console.log('기본 시스템 프롬프트 로드 완료: prompts/visual-teaching.md');
   } catch (err) {
     console.warn('시스템 프롬프트 로드 실패:', err.message);
-    systemPrompt = 'You are a helpful teaching assistant. Respond in Korean.';
+    defaultSystemPrompt = 'You are a helpful teaching assistant. Respond in Korean.';
   }
 }
+
+// 페르소나별 프롬프트 로드
+function loadPersonaPrompt(persona) {
+  if (!persona) {
+    return defaultSystemPrompt;
+  }
+  const promptPath = path.join(PROMPTS_DIR, `${persona}.md`);
+  try {
+    if (fs.existsSync(promptPath)) {
+      const content = fs.readFileSync(promptPath, 'utf-8');
+      console.log(`페르소나 프롬프트 로드: prompts/${persona}.md`);
+      return content;
+    }
+  } catch (err) {
+    console.warn(`페르소나 프롬프트 로드 실패 (${persona}):`, err.message);
+  }
+  return defaultSystemPrompt;
+}
+
 loadSystemPrompt();
 
 // Base64 PCM을 WAV로 변환하는 함수
@@ -433,13 +454,16 @@ app.post('/tts', async (req, res) => {
 // Claude Chat 엔드포인트 (Agent SDK 사용)
 app.post('/chat', async (req, res) => {
   try {
-    const { message, voice } = req.body;
+    const { message, voice, persona } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: '메시지가 필요합니다' });
     }
 
-    console.log(`Chat 요청 받음: ${message.substring(0, 50)}... (voice: ${voice || 'default'})`);
+    console.log(`Chat 요청 받음: ${message.substring(0, 50)}... (voice: ${voice || 'default'}, persona: ${persona || 'default'})`);
+
+    // 페르소나에 맞는 시스템 프롬프트 로드
+    const personaPrompt = loadPersonaPrompt(persona);
 
     // 사용자 메시지 브로드캐스트
     broadcastEvent({
@@ -456,10 +480,10 @@ app.post('/chat', async (req, res) => {
       options: {
         allowedTools: [],
         permissionMode: 'bypassPermissions',
-        systemPrompt: systemPrompt ? {
+        systemPrompt: personaPrompt ? {
           type: 'preset',
           preset: 'default',
-          append: systemPrompt
+          append: personaPrompt
         } : undefined
       }
     })) {

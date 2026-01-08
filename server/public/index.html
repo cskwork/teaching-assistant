@@ -1004,31 +1004,35 @@
     const AVATAR_PRESETS = [
       {
         id: 'character-2',
-        name: '연구원 · 침착',
+        name: '클로드 코드 강사',
         url: 'https://models.readyplayer.me/KJIXZB.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown',
         settings: { body: 'M', avatarMood: 'neutral', lipsyncLang: 'en' },
-        voice: 'Charon'
+        voice: 'Charon',
+        prompt: 'claude-code-instructor'
       },
       {
         id: 'teacher-bright',
         name: '교사 · 활기',
         url: 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown&textureSizeLimit=1024&textureFormat=png',
         settings: { body: 'F', avatarMood: 'happy', lipsyncLang: 'en' },
-        voice: 'Callirrhoe'
+        voice: 'Callirrhoe',
+        prompt: 'visual-teaching'
       },
       {
         id: 'character-3',
         name: '멘토 · 단정',
         url: 'https://models.readyplayer.me/65a8dba831b23abb4f401bae.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown',
         settings: { body: 'F', avatarMood: 'neutral', lipsyncLang: 'en' },
-        voice: 'Charon'
+        voice: 'Charon',
+        prompt: 'visual-teaching'
       },
       {
         id: 'character-5',
         name: '코치 · 밝음',
         url: 'https://models.readyplayer.me/67be034c9fab1c21c486eb14.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown',
         settings: { body: 'M', avatarMood: 'happy', lipsyncLang: 'en' },
-        voice: 'Charon'
+        voice: 'Charon',
+        prompt: 'visual-teaching'
       }
     ];
 
@@ -1336,6 +1340,13 @@
       return current?.voice || 'Charon';
     };
 
+    // 현재 아바타의 페르소나 프롬프트 ID 반환
+    window.getCurrentAvatarPrompt = function() {
+      const allAvatars = [...AVATAR_PRESETS, ...customAvatars];
+      const current = allAvatars.find(a => a.id === currentAvatarId);
+      return current?.prompt || 'visual-teaching';
+    };
+
     window.speakWithAvatar = function(audioBuffer, text) {
       console.log('[TalkingHead] speakWithAvatar called, duration:', audioBuffer?.duration);
       if (!talkingHead || !avatarReady || isAvatarLoading) {
@@ -1576,10 +1587,11 @@
       try {
         // Claude Chat 엔드포인트로 전송
         const voice = window.getCurrentAvatarVoice ? window.getCurrentAvatarVoice() : 'Charon';
+        const persona = window.getCurrentAvatarPrompt ? window.getCurrentAvatarPrompt() : 'visual-teaching';
         const response = await fetch('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: trimmed, voice })
+          body: JSON.stringify({ message: trimmed, voice, persona })
         });
         console.log('[Chat] Response status:', response.status);
         if (!response.ok) {
