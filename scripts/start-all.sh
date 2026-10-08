@@ -56,7 +56,7 @@ mkdir -p "$PROJECT_DIR/transcripts"
 
 # Excalidraw Canvas 시작
 echo "🎨 Excalidraw Canvas 시작 중... (포트 3333)"
-screen -dmS excalidraw-canvas bash -c "cd /Users/danny/Documents/PARA/Projects/mcp-excalidraw/mcp_excalidraw && PORT=3333 node dist/server.js 2>&1 | tee $PROJECT_DIR/excalidraw.log"
+screen -dmS excalidraw-canvas bash -c "cd \"${HOME}/Documents/PARA/Projects/mcp-excalidraw/mcp_excalidraw\" && PORT=3333 node dist/server.js 2>&1 | tee $PROJECT_DIR/excalidraw.log"
 
 sleep 2
 
